@@ -1,0 +1,10 @@
+gz_add_gui_plugin(ComponentInspector
+  SOURCES
+    ComponentInspector.cc
+    Pose3d.cc
+    SystemPluginInfo.cc
+  QT_HEADERS
+    ComponentInspector.hh
+    Pose3d.hh
+    SystemPluginInfo.hh
+)
