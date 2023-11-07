@@ -39,14 +39,14 @@
       name="ignition::gazebo::systems::RFComms_custom">
       <range_config>
         <max_range>500.0</max_range>
-        <fading_exponent>2.6</fading_exponent>
-        <l0>40</l0>
-        <sigma>0.0</sigma>
+        <fading_exponent>2.0</fading_exponent>
+        <l0>68</l0>
+        <sigma>3.0</sigma>
       </range_config>
       <radio_config>
         <center_frequency>600000000</center_frequency>
         <capacity>600000000</capacity>
-        <tx_power>10</tx_power>
+        <tx_power>22.5</tx_power>
         <noise_floor>-90</noise_floor>
         <modulation>QPSK</modulation>
       </radio_config>
@@ -95,7 +95,7 @@
 
     <model name="base_station_1">
       <static>true</static>
-      <pose>20 10 0.5 0 0 0</pose>
+      <pose>20 3 0.5 0 0 0</pose>
       <link name="base_station_link">
         <inertial>
           <inertia>
@@ -140,7 +140,7 @@
 
     <model name="base_station_2">
       <static>true</static>
-      <pose>40 10 0.5 0 0 0</pose>
+      <pose>40 3 0.5 0 0 0</pose>
       <link name="base_station_link">
         <inertial>
           <inertia>
@@ -525,7 +525,7 @@
             <match field="data">16777235</match>
         </input>
         <output type="ignition.msgs.Twist" topic="/cmd_vel">
-            linear: {x: 1}, angular: {z: 0.0}
+            linear: {x: 0.5}, angular: {z: 0.0}
         </output>
     </plugin>
 
@@ -536,7 +536,7 @@
             <match field="data">16777237</match>
         </input>
         <output type="ignition.msgs.Twist" topic="/cmd_vel">
-            linear: {x: -1}, angular: {z: 0.0}
+            linear: {x: -0.5}, angular: {z: 0.0}
         </output>
     </plugin>
 

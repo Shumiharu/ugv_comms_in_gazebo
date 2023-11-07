@@ -450,7 +450,7 @@ std::tuple<bool, double, double, double, double> RFComms_custom::Implementation:
     ignwarn << "Bitrate limited: [" << _txState.name << "] " << bitsSent
             << " bits sent (limit: "
             << this->radioConfig.capacity * this->epochDuration << ")"
-            << std::endl;radioConfig
+            << std::endl;
     return std::make_tuple(false, -std::numeric_limits<double>::max(), 1.0, 1.0, std::numeric_limits<double>::lowest());
   }
 
@@ -459,11 +459,11 @@ std::tuple<bool, double, double, double, double> RFComms_custom::Implementation:
   _txState.bytesSentThisEpoch += _numBytes;
 
   // Get the received power based on TX power and position of each node.
-  auto rxPowerDist =
-    this->FreeSpaceReceivedPower(this->radioConfig.txPower, _txState, _rxState);
-
   // auto rxPowerDist =
-  //   this->LogNormalReceivedPower(this->radioConfig.txPower, _txState, _rxState);
+  //   this->FreeSpaceReceivedPower(this->radioConfig.txPower, _txState, _rxState);
+
+  auto rxPowerDist =
+    this->LogNormalReceivedPower(this->radioConfig.txPower, _txState, _rxState);
   
   // auto rxPowerDist =
   //   this->BasedOn3gppR16ReceivedPower(this->radioConfig.txPower, _txState, _rxState);
