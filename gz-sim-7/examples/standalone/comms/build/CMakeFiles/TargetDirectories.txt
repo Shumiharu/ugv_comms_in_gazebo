@@ -1,3 +1,0 @@
-/home/haruki/Desktop/ugv_comms_in_gazebo/gz-sim-fortress/examples/standalone/comms/build/CMakeFiles/publisher.dir
-/home/haruki/Desktop/ugv_comms_in_gazebo/gz-sim-fortress/examples/standalone/comms/build/CMakeFiles/edit_cache.dir
-/home/haruki/Desktop/ugv_comms_in_gazebo/gz-sim-fortress/examples/standalone/comms/build/CMakeFiles/rebuild_cache.dir

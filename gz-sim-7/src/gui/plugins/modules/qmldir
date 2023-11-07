@@ -1,6 +1,0 @@
-module GzSim
-
-plugin EntityContextMenu
-
-EntityContextMenu 1.0 qrc:/GzSim/EntityContextMenu.qml
-TypeIcon 1.0 qrc:/GzSim/TypeIcon.qml
