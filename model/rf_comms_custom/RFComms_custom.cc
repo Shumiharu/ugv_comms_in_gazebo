@@ -22,6 +22,7 @@
 #include <random>
 #include <string>
 #include <tuple>
+#include <vector>
 #include <unordered_map>
 #include <utility>
 #include <fstream>
@@ -126,6 +127,9 @@ struct RadioConfiguration
   /// \brief Noise floor of the radio in dBm.
   double noiseFloor = -90;
 
+  /// \brief Path of horn antenna gains.
+  std::string antennaGainDirPath = "/home/haruki/Desktop/ugv_comms_in_gazebo/model/antenna_gains";
+
   /// Output stream operator.
   /// \param _oss Stream.
   /// \param _config configuration to output.
@@ -138,6 +142,7 @@ struct RadioConfiguration
          << "-- tx_power: " << _config.txPower << std::endl
          << "-- noise_floor: " << _config.noiseFloor << std::endl
          << "-- modulation: " << _config.modulation << std::endl;
+         << "-- antenna_gain_dir_path: " << _config.antennaGainDirPath << std::endl;
 
     return _oss;
   }
@@ -598,8 +603,44 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
     this->dataPtr->radioConfig.noiseFloor =
       elem->Get<double>("noise_floor",
         this->dataPtr->radioConfig.noiseFloor).first;
+
+    this->dataPtr->radioConfig.antennaGainDirPath =
+      elem->Get<std::string>("antenna_gain_dir_path",
+        this->dataPtr->radioConfig.antennaGainDirPath).first;
   }
 
+  // Load antenna gain files
+  std::ifstream ePlaneFile(this->dataPtr->radioConfig.antennaGainDirPath + "e_plane.csv");
+  std::ifstream hPlaneFile(this->dataPtr->radioConfig.antennaGainDirPath + "p_plane.csv");
+
+  // Define antena gain
+  std::vector<std::vector<double> > ePlane;
+  std::vector<std::vector<double> > hPlane;
+
+  if (ePlaneFile && hPlaneFile)
+  {
+    std::string line;
+    while (getline(ePlane, angle))
+    {
+      std::vector<double> ePVec;
+      std::vector<double> strvec = split(line, ',');
+
+    }
+
+    while (getline(hPlane, angle))
+    {
+      std::vector<double> hPVec;
+
+    }
+    angle
+  } 
+  else 
+  {
+    ignwrn << "Cannot lead antenna gain files." << std::endl;
+  }
+
+
+  // Generate result files
   this->dataPtr->writing_file.open(this->dataPtr->fileConfig.filePath, std::ios::out);
   this->dataPtr->writing_file << "X(m),Y(m),Z(m),Distance_BS_1,RSSI,BER,PER,Throughput(Gbps)" << std::endl;
 
