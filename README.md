@@ -1,8 +1,31 @@
 # ugv_comms_in_gazebo
 
 ## rf_comms.cc -> rf_comms_custom.cc にカスタマイズする
-gz-sim/src/systems/rf_commsのフォルダごとコピーしてrf_comms.ccからrf_comms_custom.ccとしてカスタマイズします（他のプラグインを書き換える際もそのほうが簡単です）
-書き換えたrf_comms_custom.ccをGazeboが読み込めるようにするには
+gz-sim/src/systems/rf_commsのフォルダをmodel/にコピーし、rf_commsからrf_comms_customとしてカスタマイズしています（おおよそRFComms->RFComms_customに名称変更すれば使えるはずです）。例えば、
+
+変更前 rf_comms.cc line 475
+```
+IGNITION_ADD_PLUGIN(RFComms,
+                    ignition::gazebo::System,
+                    comms::ICommsModel::ISystemConfigure,
+                    comms::ICommsModel::ISystemPreUpdate)
+
+IGNITION_ADD_PLUGIN_ALIAS(RFComms,
+                          "ignition::gazebo::systems::RFComms")
+```
+
+変更後 rf_comms_custom.cc
+```
+IGNITION_ADD_PLUGIN(RFComms_custom,
+                    ignition::gazebo::System,
+                    comms::ICommsModel::ISystemConfigure,
+                    comms::ICommsModel::ISystemPreUpdate)
+
+IGNITION_ADD_PLUGIN_ALIAS(RFComms_custom,
+                          "ignition::gazebo::systems::RFComms_custom")
+```
+
+カスタマイズしたrf_comms_custom.ccをGazeboが読み込めるようにするには
 ```
 cd ugv_comms_in_gazebo/model/rf_comms_custom
 mkdir build 
@@ -11,8 +34,9 @@ cmake ..
 make
 sudo cp ./libRFComms_custom.so /usr/lib/x86_64-linux-gnu/ign-gazebo-6/plugins/.
 ```
+のようにビルドして生成されたlibRFComms_custom.soをGazeboがプラグインを参照するパス/usr/lib/x86_64-linux-gnu/ign-gazebo-6/plugins/にコピーする必要があります。
 
-さらにプラグイン参照先も変更してください。
+さらにプラグイン参照先も変更してください
 
 変更前 rf_comms.sdf
 ```
@@ -66,6 +90,7 @@ ign gazebo -v<$NUMBER> rf_comms_custom.sdf
 ```
 
 ## 送信
+gz-sim/examples/standalone/commsをフォルダごとコピーしてmodelフォルダにコピーしています
 ```
 cd ugv_comms_in_gazebo/model/comms
 mkdir build
