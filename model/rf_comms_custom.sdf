@@ -1,9 +1,9 @@
 
 <!--
-  Ignition Gazebo rfcomms plugin demo.
+  Ignition Gazebo rfcomms customaized plugin.
 
   Compile the comms publisher:
-    cd ign-gazebo/examples/standalone/comms
+    cd model/comms
     mkdir build
     cd build
     cmake ..
