@@ -1,5 +1,5 @@
 CMakeFiles/RFComms_custom.dir/RFComms_custom.cc.o: \
- /home/haruki/Desktop/ugv_comms_in_gazebo/model/rf_comms_custom/RFComms_custom.cc \
+ /home/haruki/Desktop/ugv_comms_in_gazebo/src/rf_comms_custom/RFComms_custom.cc \
  /usr/include/stdc-predef.h \
  /usr/include/ignition/msgs8/gz/msgs/dataframe.pb.h \
  /usr/include/ignition/msgs8/ignition/msgs/dataframe.pb.h \
@@ -828,5 +828,5 @@ CMakeFiles/RFComms_custom.dir/RFComms_custom.cc.o: \
  /usr/include/ignition/gazebo6/gz/sim/Model.hh \
  /usr/include/ignition/gazebo6/gz/sim/Util.hh \
  /usr/include/ignition/msgs8/gz/msgs/entity.pb.h \
- /home/haruki/Desktop/ugv_comms_in_gazebo/model/rf_comms_custom/RFComms_custom.hh \
+ /home/haruki/Desktop/ugv_comms_in_gazebo/src/rf_comms_custom/RFComms_custom.hh \
  /usr/include/ignition/gazebo6/gz/sim/comms/ICommsModel.hh

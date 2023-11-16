@@ -35,6 +35,7 @@
 #include <gz/common/Profiler.hh>
 #include <gz/math/Pose3.hh>
 #include <gz/math/Rand.hh>
+#include <gz/math/Vector3.hh>
 #include <gz/plugin/Register.hh>
 #include "gz/sim/comms/MsgManager.hh"
 #include "gz/sim/components/Pose.hh"
@@ -49,7 +50,6 @@ using namespace systems;
 
 struct FileConfiguration
 {
-  // Get Date
   std::string currentDateTime() 
   {
     std::time_t t = std::time(nullptr);
@@ -59,14 +59,15 @@ struct FileConfiguration
     strftime(buffer, sizeof(buffer), "%Y_%m_%d_%X", now);
     return buffer;
   }
-  
-  // Generate csv file
-  std::string filePath = "/home/haruki/Desktop/ugv_comms_in_gazebo/model/result/" + currentDateTime() + ".csv";
+
+  std::string commsAnalysisDirPath = "/home/haruki/Desktop/ugv_comms_in_gazebo/comms_analysis/";
+  // std::string antennaGainsDirPath = "/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains/";
   
   friend std::ostream &operator<<(std::ostream &_oss,
                                   const FileConfiguration &_config)
   {
-    _oss << "File Path: " << _config.filePath << std::endl;
+    _oss << "Comms Analysis Directory Path: " << _config.commsAnalysisDirPath << std::endl;
+        //  << "Antenna Gain Directory Path: " << _config.antennaGainsDirPath << std::endl;
 
     return _oss;
   }
@@ -127,8 +128,26 @@ struct RadioConfiguration
   /// \brief Noise floor of the radio in dBm.
   double noiseFloor = -90;
 
-  /// \brief Path of horn antenna gains.
-  std::string antennaGainDirPath = "/home/haruki/Desktop/ugv_comms_in_gazebo/model/antenna_gains";
+  /// \brief Directly Path of horn antenna gains.
+  std::string antennaGainsDirPath = "/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains";
+
+  /// \brief Vertical antenna direction gain.
+  std::vector<std::vector<double>> ePlane;
+
+  /// \brief holizontal antenna direction gain.
+  std::vector<std::vector<double>> hPlane;
+
+  /// \brief holizontal antenna direction gain.
+  double txVarphi = 45.0;
+
+  /// \brief holizontal antenna direction gain.
+  double txTheta = 0.0;
+
+  /// \brief holizontal antenna direction gain.
+  double rxVarphi = -135.0;
+
+  /// \brief holizontal antenna direction gain.
+  double rxTheta = 0.0;
 
   /// Output stream operator.
   /// \param _oss Stream.
@@ -142,7 +161,6 @@ struct RadioConfiguration
          << "-- tx_power: " << _config.txPower << std::endl
          << "-- noise_floor: " << _config.noiseFloor << std::endl
          << "-- modulation: " << _config.modulation << std::endl;
-         << "-- antenna_gain_dir_path: " << _config.antennaGainDirPath << std::endl;
 
     return _oss;
   }
@@ -160,7 +178,7 @@ struct RadioState
   /// \brief Pose of the radio.
   ignition::math::Pose3<double> pose;
 
-  /// \brief Recent sent packet history.
+  /// \brief Recent sent packet history.filePath
   std::list<std::pair<double, uint64_t>> bytesSent;
 
   /// \brief Accumulation of bytes sent in an epoch.
@@ -212,6 +230,17 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
   public: std::tuple<bool, double, double, double, double> AttemptSend(RadioState &_txState,
                                                RadioState &_rxState,
                                                const uint64_t &_numBytes);
+
+  /// \brief Convert from e_plane.csv and h_plane.csv to two dimensional array.
+  public: std::vector<std::vector<double>> FileToArray(std::string _filePath) const;
+
+  public: double PostionsToAntennaGain(auto _position, std::tuple<double, double> _argument) const;
+
+  /// \brief Convert degree to radian.
+  public: double DegreeToRadian(double _degree) const;
+
+  /// \brief Convert degree to radian.
+  public: double RadianToDegree(double _radian) const;
 
   /// \brief Convert from dBm to power.
   /// \param[in] _dBm Input in dBm.
@@ -276,9 +305,69 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
 };
 
 /////////////////////////////////////////////
+std::vector<std::vector<double>> RFComms_custom::Implementation::FileToArray(std::string _filePath) const
+{ 
+  std::ifstream file(_filePath);
+  std::vector<std::vector<double>> array;
+
+  if (file)
+  {
+    std::string line;
+    while (getline(file, line))
+    {
+      std::vector<double> row;
+      std::stringstream ss(line);
+
+      std::string value;
+      while (std::getline(ss, value, ','))
+      {
+        row.push_back(std::stod(value));
+      }
+      array.push_back(row);
+    }
+  }
+  else
+  {
+    ignerr << "Cannot read " << _filePath << std::endl;
+  }
+  
+  return array;
+}
+
+/////////////////////////////////////////////
+double RFComms_custom::Implementation::DegreeToRadian(double _degree) const
+{
+  return _degree * M_PI/180.0;
+}
+
+double RFComms_custom::Implementation::RadianToDegree(double _radian) const
+{
+  return _radian * 180.0/M_PI; 
+}
+
+/////////////////////////////////////////////
 double RFComms_custom::Implementation::DbmToPow(double _dBm) const
 {
   return 0.001 * pow(10., _dBm / 10.);
+}
+
+/////////////////////////////////////////////
+double RFComms_custom::Implementation::PostionsToAntennaGain(
+  const RadioState &_txState, const RadioState &_rxState,
+  std::tuple<double, double> _argument) const
+{
+
+  const auto rxVector = _txState.pose.Pos() - _rxState.pose.Pos();
+  const double theta = acos(rxVector.Normalized().Z());
+
+
+  // const auto normalizedVectorX = 
+   
+
+  // const double dotProd = _txState.pose.Pos().Normalized().Dot(_rxState.pose.Pos().Normalized());
+
+  // std::cout << dotProd << std::endl;
+  return 0.0;
 }
 
 ////////////////////////////////////////////
@@ -373,6 +462,10 @@ RFPower RFComms_custom::Implementation::LogNormalReceivedPower(
 {
   const double kRange = _txState.pose.Pos().Distance(_rxState.pose.Pos());
 
+  const double txAntennaGain = this->PostionsToAntennaGain(_txState.pose.Pos(), radioConfig.txVarphi, radioConfig.txTheta);
+
+  const double rxAnntennaGain = this->PostionsToAntennaGain(_rxState.pose.Pos(), radioConfig.rxVarphi, radioConfig.rxTheta);
+
   if (this->rangeConfig.maxRange > 0.0 && kRange > this->rangeConfig.maxRange) // 通信可能範囲外の場合
     return {-std::numeric_limits<double>::infinity(), 0.0};
 
@@ -401,6 +494,7 @@ RFPower RFComms_custom::Implementation::BasedOn3gppR16ReceivedPower(
   const double breakPointRange = 4. * (_txState.pose.Pos()[2] - effectiveEnvironmentRange) * (_rxState.pose.Pos()[2] - effectiveEnvironmentRange) * (this->radioConfig.centerFrequency/this->radioConfig.speedOfLight);
 
   double kPL; // https://www.etsi.org/deliver/etsi_tr/138900_138999/138901/16.01.00_60/tr_138901v160100p.pdf
+  
   if (kRange < breakPointRange)
   {
     kPL = 28. + 22. * log10(kRange) + 20. * log10(this->radioConfig.centerFrequency);
@@ -544,27 +638,21 @@ RFComms_custom::RFComms_custom()
 {
 }
 
-bool RandomBool(double probability,
-                  int accuracy)
-{
-  int rnd = rand()%accuracy;
-  if (rnd < int(probability * accuracy))
-  {
-    return true; 
-  } 
-  else
-  {
-    return false;
-  }
-}
-
-
 //////////////////////////////////////////////////
 void RFComms_custom::Load(const Entity &/*_entity*/,
     std::shared_ptr<const sdf::Element> _sdf,
     EntityComponentManager &/*_ecm*/,
     EventManager &/*_eventMgr*/)
 {
+  
+  if (_sdf->HasElement("file_config"))
+  {
+    sdf::ElementPtr elem = _sdf->Clone()->GetElement("file_config");
+    this->dataPtr->fileConfig.commsAnalysisDirPath = 
+      elem->Get<std::string>("comms_analysis", this->dataPtr->fileConfig.commsAnalysisDirPath).first;
+  }
+  
+  
   if (_sdf->HasElement("range_config"))
   {
     sdf::ElementPtr elem = _sdf->Clone()->GetElement("range_config");
@@ -604,44 +692,37 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
       elem->Get<double>("noise_floor",
         this->dataPtr->radioConfig.noiseFloor).first;
 
-    this->dataPtr->radioConfig.antennaGainDirPath =
-      elem->Get<std::string>("antenna_gain_dir_path",
-        this->dataPtr->radioConfig.antennaGainDirPath).first;
+    this->dataPtr->radioConfig.antennaGainsDirPath =
+      elem->Get<std::string>("antenna_gains_dir_path",
+        this->dataPtr->radioConfig.antennaGainsDirPath).first;
+    
+    this->dataPtr->radioConfig.ePlane = 
+      this->dataPtr->FileToArray(this->dataPtr->radioConfig.antennaGainsDirPath + "e_plane.csv");
+
+    this->dataPtr->radioConfig.hPlane = 
+      this->dataPtr->FileToArray(this->dataPtr->radioConfig.antennaGainsDirPath + "h_plane.csv");
+
+    // this->dataPtr->radioConfig.txVarphi =
+    //   elem->Get<std::string>("tx_varphi",
+    //     this->dataPtr->radioConfig.txVarphi).first;
+    
+    // this->dataPtr->radioConfig.txTheta =
+    //   elem->Get<std::string>("tx_theta",
+    //     this->dataPtr->radioConfig.txTheta).first;
+    
+    // this->dataPtr->radioConfig.rxVarphi =
+    //   elem->Get<std::string>("rx_varphi",
+    //     this->dataPtr->radioConfig.rxVarphi).first;
+                                                                                                                                                                                                                                                                                                                                                                                                           
+    // this->dataPtr->radioConfig.rxTheta =
+    //   elem->Get<std::string>("rx_Theta",
+    //     this->dataPtr->radioConfig.rxVarphi).first;
+
   }
 
-  // Load antenna gain files
-  std::ifstream ePlaneFile(this->dataPtr->radioConfig.antennaGainDirPath + "e_plane.csv");
-  std::ifstream hPlaneFile(this->dataPtr->radioConfig.antennaGainDirPath + "p_plane.csv");
-
-  // Define antena gain
-  std::vector<std::vector<double> > ePlane;
-  std::vector<std::vector<double> > hPlane;
-
-  if (ePlaneFile && hPlaneFile)
-  {
-    std::string line;
-    while (getline(ePlane, angle))
-    {
-      std::vector<double> ePVec;
-      std::vector<double> strvec = split(line, ',');
-
-    }
-
-    while (getline(hPlane, angle))
-    {
-      std::vector<double> hPVec;
-
-    }
-    angle
-  } 
-  else 
-  {
-    ignwrn << "Cannot lead antenna gain files." << std::endl;
-  }
-
-
-  // Generate result files
-  this->dataPtr->writing_file.open(this->dataPtr->fileConfig.filePath, std::ios::out);
+  // Generate  files
+  std::string commsAnalysisFilePath = this->dataPtr->fileConfig.commsAnalysisDirPath + this->dataPtr->fileConfig.currentDateTime() + ".csv";
+  this->dataPtr->writing_file.open(commsAnalysisFilePath, std::ios::out);
   this->dataPtr->writing_file << "X(m),Y(m),Z(m),Distance_BS_1,RSSI,BER,PER,Throughput(Gbps)" << std::endl;
 
   igndbg << "File configuration:" << std::endl
@@ -746,7 +827,6 @@ void RFComms_custom::Step(
     _newRegistry[address].outboundMsgs.clear();
   }
 }
-
 IGNITION_ADD_PLUGIN(RFComms_custom,
                     ignition::gazebo::System,
                     comms::ICommsModel::ISystemConfigure,

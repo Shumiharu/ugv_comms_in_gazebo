@@ -54,10 +54,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/haruki/Desktop/ugv_comms_in_gazebo/model/rf_comms_custom
+CMAKE_SOURCE_DIR = /home/haruki/Desktop/ugv_comms_in_gazebo/src/rf_comms_custom
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/haruki/Desktop/ugv_comms_in_gazebo/model/rf_comms_custom/build
+CMAKE_BINARY_DIR = /home/haruki/Desktop/ugv_comms_in_gazebo/src/rf_comms_custom/build
 
 #=============================================================================
 # Directory level rules for the build root directory
@@ -81,14 +81,14 @@ clean: CMakeFiles/RFComms_custom.dir/clean
 CMakeFiles/RFComms_custom.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/RFComms_custom.dir/build.make CMakeFiles/RFComms_custom.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/RFComms_custom.dir/build.make CMakeFiles/RFComms_custom.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/haruki/Desktop/ugv_comms_in_gazebo/model/rf_comms_custom/build/CMakeFiles --progress-num=1,2 "Built target RFComms_custom"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/haruki/Desktop/ugv_comms_in_gazebo/src/rf_comms_custom/build/CMakeFiles --progress-num=1,2 "Built target RFComms_custom"
 .PHONY : CMakeFiles/RFComms_custom.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/RFComms_custom.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/haruki/Desktop/ugv_comms_in_gazebo/model/rf_comms_custom/build/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/haruki/Desktop/ugv_comms_in_gazebo/src/rf_comms_custom/build/CMakeFiles 2
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/RFComms_custom.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/haruki/Desktop/ugv_comms_in_gazebo/model/rf_comms_custom/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/haruki/Desktop/ugv_comms_in_gazebo/src/rf_comms_custom/build/CMakeFiles 0
 .PHONY : CMakeFiles/RFComms_custom.dir/rule
 
 # Convenience name for target.
