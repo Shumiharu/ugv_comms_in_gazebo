@@ -152,9 +152,9 @@ struct RadioConfiguration
   /// \brief holizontal antenna direction gain.
   double rxTheta = 90.0;
 
-  ignition::math::Quaterniond txRot = ignition::math::Quaterniond(0, 0, -5*M_PI/4);
+  ignition::math::Quaterniond txAntennaRot = ignition::math::Quaterniond(-M_PI/2, -5*M_PI/4, 0);
 
-  ignition::math::Quaterniond rxRot = ignition::math::Quaterniond(0, 0, M_PI/4);
+  ignition::math::Quaterniond rxAntennaRot = ignition::math::Quaterniond(-M_PI/2, M_PI/4, 0);
 
   /// Output stream operator.
   /// \param _oss Stream.
@@ -364,22 +364,12 @@ double RFComms_custom::Implementation::DbmToPow(double _dBm) const
 double RFComms_custom::Implementation::PostionsToAntennaGain(
   const RadioState &_txState, const RadioState &_rxState) const
 {
-  auto moveForwardDirection = _rxState.pose.Rot().RotateVector(ignition::math::Vector3d::UnitX);
+  auto antennaRot = _rxState.pose.Rot();
+  antennaRot *= ignition::math::Quaterniond(this->radioConfig.rxAntennaRot.Roll(), 0.0, 0.0);
+
+  auto moveForwardDirection = antennaRot.RotateVector(ignition::math::Vector3d::UnitX);
  
-  auto refDirection = _rxState.pose.Rot().RotateVectorReverse(_txState.pose.Pos() - _rxState.pose.Pos());
-
-  auto refDirectionH = refDirection;
-  refDirectionH.Z(0.0);
-  
-  double varphi = acos(refDirectionH.Normalized().Dot(ignition::math::Vector3d::UnitX));
-  if (refDirectionH.Y() < 0.0)
-  {
-    varphi = -varphi;
-  }
-  std::cout << "varphi: " << this->RadianToDegree(varphi) << std::endl;
-
-  double angleOfRadiationH = round(this->RadianToDegree(varphi - this->radioConfig.rxRot.Yaw())*10.0)/10.0;
-
+  auto refDirection = antennaRot.RotateVectorReverse(_txState.pose.Pos() - _rxState.pose.Pos());
 
   auto refDirectionE = refDirection;
   refDirectionE.Y(0.0);
@@ -389,12 +379,19 @@ double RFComms_custom::Implementation::PostionsToAntennaGain(
   {
     theta = -theta;
   }
-  std::cout << "theta: " << this->RadianToDegree(theta) << std::endl;
 
-  double angleOfRadiationE = round((this->RadianToDegree(theta - this->radioConfig.rxRot.Pitch()))*10.0)/10.0;
+  double angleOfRadiationE = round((this->RadianToDegree(theta - this->radioConfig.rxAntennaRot.Pitch()))*10.0)/10.0;
 
-  std::cout << "H: " << angleOfRadiationH << std::endl;
-  std::cout << "E: " << angleOfRadiationE << std::endl; 
+  auto refDirectionH = refDirection;
+  refDirectionH.Z(0.0);
+  
+  double varphi = acos(refDirectionH.Normalized().Dot(ignition::math::Vector3d::UnitX));
+  if (refDirectionH.Y() < 0.0)
+  {
+    varphi = -varphi;
+  }
+
+  double angleOfRadiationH = round(this->RadianToDegree(varphi - this->radioConfig.rxAntennaRot.Yaw())*10.0)/10.0;
 
   auto antennaGainE = std::find_if(
     std::begin(this->radioConfig.ePlane), std::end(this->radioConfig.ePlane),
