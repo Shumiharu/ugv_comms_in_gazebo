@@ -29,6 +29,8 @@
 #include <sstream>
 #include <iostream>
 #include <ctime>
+#include <algorithm>
+#include <iterator>
 #include <bits/stdc++.h>
 
 #include <sdf/sdf.hh>
@@ -36,6 +38,7 @@
 #include <gz/math/Pose3.hh>
 #include <gz/math/Rand.hh>
 #include <gz/math/Vector3.hh>
+#include <gz/math/Quaternion.hh>
 #include <gz/plugin/Register.hh>
 #include "gz/sim/comms/MsgManager.hh"
 #include "gz/sim/components/Pose.hh"
@@ -141,13 +144,17 @@ struct RadioConfiguration
   double txVarphi = 45.0;
 
   /// \brief holizontal antenna direction gain.
-  double txTheta = 0.0;
+  double txTheta = 90.0;
 
   /// \brief holizontal antenna direction gain.
   double rxVarphi = -135.0;
 
   /// \brief holizontal antenna direction gain.
-  double rxTheta = 0.0;
+  double rxTheta = 90.0;
+
+  ignition::math::Quaterniond txRot = ignition::math::Quaterniond(0, 0, -5*M_PI/4);
+
+  ignition::math::Quaterniond rxRot = ignition::math::Quaterniond(0, 0, M_PI/4);
 
   /// Output stream operator.
   /// \param _oss Stream.
@@ -234,7 +241,8 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
   /// \brief Convert from e_plane.csv and h_plane.csv to two dimensional array.
   public: std::vector<std::vector<double>> FileToArray(std::string _filePath) const;
 
-  public: double PostionsToAntennaGain(auto _position, std::tuple<double, double> _argument) const;
+  private: double PostionsToAntennaGain(const RadioState &_txState,
+                                        const RadioState &_rxState) const;
 
   /// \brief Convert degree to radian.
   public: double DegreeToRadian(double _degree) const;
@@ -351,23 +359,67 @@ double RFComms_custom::Implementation::DbmToPow(double _dBm) const
   return 0.001 * pow(10., _dBm / 10.);
 }
 
+
 /////////////////////////////////////////////
 double RFComms_custom::Implementation::PostionsToAntennaGain(
-  const RadioState &_txState, const RadioState &_rxState,
-  std::tuple<double, double> _argument) const
+  const RadioState &_txState, const RadioState &_rxState) const
 {
+  auto moveForwardDirection = _rxState.pose.Rot().RotateVector(ignition::math::Vector3d::UnitX);
+ 
+  auto refDirection = _rxState.pose.Rot().RotateVectorReverse(_txState.pose.Pos() - _rxState.pose.Pos());
 
-  const auto rxVector = _txState.pose.Pos() - _rxState.pose.Pos();
-  const double theta = acos(rxVector.Normalized().Z());
+  auto refDirectionH = refDirection;
+  refDirectionH.Z(0.0);
+  
+  double varphi = acos(refDirectionH.Normalized().Dot(ignition::math::Vector3d::UnitX));
+  if (refDirectionH.Y() < 0.0)
+  {
+    varphi = -varphi;
+  }
+  std::cout << "varphi: " << this->RadianToDegree(varphi) << std::endl;
+
+  double angleOfRadiationH = round(this->RadianToDegree(varphi - this->radioConfig.rxRot.Yaw())*10.0)/10.0;
 
 
-  // const auto normalizedVectorX = 
-   
+  auto refDirectionE = refDirection;
+  refDirectionE.Y(0.0);
 
-  // const double dotProd = _txState.pose.Pos().Normalized().Dot(_rxState.pose.Pos().Normalized());
+  double theta = acos(refDirectionE.Normalized().Dot(ignition::math::Vector3d::UnitX));
+  if (refDirectionE.Z() < 0.0)
+  {
+    theta = -theta;
+  }
+  std::cout << "theta: " << this->RadianToDegree(theta) << std::endl;
 
-  // std::cout << dotProd << std::endl;
-  return 0.0;
+  double angleOfRadiationE = round((this->RadianToDegree(theta - this->radioConfig.rxRot.Pitch()))*10.0)/10.0;
+
+  std::cout << "H: " << angleOfRadiationH << std::endl;
+  std::cout << "E: " << angleOfRadiationE << std::endl; 
+
+  auto antennaGainE = std::find_if(
+    std::begin(this->radioConfig.ePlane), std::end(this->radioConfig.ePlane),
+    [&](const auto& row) {
+      
+      return row.at(0) == angleOfRadiationE;
+    }
+  );
+
+  auto antennaGainH = std::find_if(
+    std::begin(this->radioConfig.hPlane), std::end(this->radioConfig.hPlane),
+    [&](const auto& row) {
+      
+      return row.at(0) == angleOfRadiationH;
+    }
+  );
+
+
+  if (antennaGainE == std::end(this->radioConfig.ePlane)) 
+  {
+    std::cout << "Out of Range..." << std::endl;
+  }
+
+
+  return varphi;
 }
 
 ////////////////////////////////////////////
@@ -462,9 +514,9 @@ RFPower RFComms_custom::Implementation::LogNormalReceivedPower(
 {
   const double kRange = _txState.pose.Pos().Distance(_rxState.pose.Pos());
 
-  const double txAntennaGain = this->PostionsToAntennaGain(_txState.pose.Pos(), radioConfig.txVarphi, radioConfig.txTheta);
+  const double txAntennaGain = this->PostionsToAntennaGain(_txState, _rxState);
 
-  const double rxAnntennaGain = this->PostionsToAntennaGain(_rxState.pose.Pos(), radioConfig.rxVarphi, radioConfig.rxTheta);
+  // const double rxAnntennaGain = this->PostionsToAntennaGain(_rxState, _txState);
 
   if (this->rangeConfig.maxRange > 0.0 && kRange > this->rangeConfig.maxRange) // 通信可能範囲外の場合
     return {-std::numeric_limits<double>::infinity(), 0.0};

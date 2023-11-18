@@ -189,6 +189,7 @@
 
     <model name="ugv">
       <pose>-2 0 0.5 0 0 0</pose>
+      <static>true</static>
       <link name="ugv_link">
         <inertial>
           <mass>10.0</mass>
