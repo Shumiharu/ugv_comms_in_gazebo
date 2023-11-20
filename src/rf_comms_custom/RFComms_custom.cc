@@ -140,21 +140,11 @@ struct RadioConfiguration
   /// \brief holizontal antenna direction gain.
   std::vector<std::vector<double>> hPlane;
 
-  /// \brief holizontal antenna direction gain.
-  double txVarphi = 45.0;
+  ignition::math::Quaterniond txAntennaRot = ignition::math::Quaterniond(M_PI/2, 0., M_PI/4);
 
-  /// \brief holizontal antenna direction gain.
-  double txTheta = 90.0;
+  ignition::math::Quaterniond rxAntennaRot = ignition::math::Quaterniond(M_PI/2, 0., M_PI/4);
 
-  /// \brief holizontal antenna direction gain.
-  double rxVarphi = -135.0;
-
-  /// \brief holizontal antenna direction gain.
-  double rxTheta = 90.0;
-
-  ignition::math::Quaterniond txAntennaRot = ignition::math::Quaterniond(-M_PI/2, -5*M_PI/4, 0);
-
-  ignition::math::Quaterniond rxAntennaRot = ignition::math::Quaterniond(-M_PI/2, M_PI/4, 0);
+  double maxAntennaGain;
 
   /// Output stream operator.
   /// \param _oss Stream.
@@ -184,6 +174,9 @@ struct RadioState
 
   /// \brief Pose of the radio.
   ignition::math::Pose3<double> pose;
+
+  /// \brief Angle of the radio.
+  ignition::math::Quaterniond antennaRot;
 
   /// \brief Recent sent packet history.filePath
   std::list<std::pair<double, uint64_t>> bytesSent;
@@ -241,8 +234,9 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
   /// \brief Convert from e_plane.csv and h_plane.csv to two dimensional array.
   public: std::vector<std::vector<double>> FileToArray(std::string _filePath) const;
 
-  private: double PostionsToAntennaGain(const RadioState &_txState,
-                                        const RadioState &_rxState) const;
+  private: double PoseToGain(const RadioState &_initialPointState,
+                             const RadioState &_terminalPointState,
+                             const double maxAntennaGain) const;
 
   /// \brief Convert degree to radian.
   public: double DegreeToRadian(double _degree) const;
@@ -361,62 +355,70 @@ double RFComms_custom::Implementation::DbmToPow(double _dBm) const
 
 
 /////////////////////////////////////////////
-double RFComms_custom::Implementation::PostionsToAntennaGain(
-  const RadioState &_txState, const RadioState &_rxState) const
+double RFComms_custom::Implementation::PoseToGain(
+  const RadioState &_initialPointState,
+  const RadioState &_terminalPointState,
+  // ignition::math::Pose3 &_initialPointPose,
+  // ignition::math::Pose3 &_terminalPointState.pose,
+  // ignition::math::Quaterniond &_initialAntennaRot,
+  const double maxAntennaGain) const
 {
-  auto antennaRot = _rxState.pose.Rot();
-  antennaRot *= ignition::math::Quaterniond(this->radioConfig.rxAntennaRot.Roll(), 0.0, 0.0);
-
-  auto moveForwardDirection = antennaRot.RotateVector(ignition::math::Vector3d::UnitX);
- 
-  auto refDirection = antennaRot.RotateVectorReverse(_txState.pose.Pos() - _rxState.pose.Pos());
-
+  // auto antennaRot = _terminalPointState.pose.Rot();
+  // antennaRot *= ignition::math::Quaterniond(this->radioConfig.rxAntennaRot.Roll(), 0.0, 0.0);
+  // auto antennaRot = _terminalPointState.pose.Rot() * ignition::math::Quaterniond(this->radioConfig.rxAntennaRot.Roll(), 0.0, 0.0);
+  auto antennaRot = _terminalPointState.pose.Rot() * this->radioConfig.rxAntennaRot;
+  std::cout << antennaRot << std::endl;
+  auto refDirection = antennaRot.RotateVectorReverse(_initialPointState.pose.Pos() - _terminalPointState.pose.Pos());
+  std::cout << refDirection << std::endl;
   auto refDirectionE = refDirection;
   refDirectionE.Y(0.0);
-
-  double theta = acos(refDirectionE.Normalized().Dot(ignition::math::Vector3d::UnitX));
+  double theta = round((this->RadianToDegree(acos(refDirectionE.Normalized().Dot(ignition::math::Vector3d::UnitX))))*10.)/10.;
   if (refDirectionE.Z() < 0.0)
   {
     theta = -theta;
   }
 
-  double angleOfRadiationE = round((this->RadianToDegree(theta - this->radioConfig.rxAntennaRot.Pitch()))*10.0)/10.0;
+  std::cout << "theta: " << theta << std::endl;
+
+  // double angleOfRadiationE = round((this->RadianToDegree(theta - this->radioConfig.rxAntennaRot.Pitch()))*10.0)/10.0;
+  // double angleOfRadiationE = round((this->RadianToDegree(theta))*10.0)/10.0;
+  auto itEPlane = std::find_if(
+    std::begin(this->radioConfig.ePlane), std::end(this->radioConfig.ePlane),
+    [&](const auto& row) {
+      return row.at(0) == theta;
+    }
+  );
 
   auto refDirectionH = refDirection;
   refDirectionH.Z(0.0);
-  
-  double varphi = acos(refDirectionH.Normalized().Dot(ignition::math::Vector3d::UnitX));
+  double varphi = round(this->RadianToDegree(acos(refDirectionH.Normalized().Dot(ignition::math::Vector3d::UnitX)))*10.)/10.;
   if (refDirectionH.Y() < 0.0)
   {
     varphi = -varphi;
   }
 
-  double angleOfRadiationH = round(this->RadianToDegree(varphi - this->radioConfig.rxAntennaRot.Yaw())*10.0)/10.0;
+  std::cout << "varphi: " << varphi << std::endl;
 
-  auto antennaGainE = std::find_if(
-    std::begin(this->radioConfig.ePlane), std::end(this->radioConfig.ePlane),
-    [&](const auto& row) {
-      
-      return row.at(0) == angleOfRadiationE;
-    }
-  );
+  // double angleOfRadiationH = round(this->RadianToDegree(varphi - this->radioConfig.rxAntennaRot.Yaw())*10.0)/10.0;
+  // double angleOfRadiationH = round(this->RadianToDegree(varphi)*10.0)/10.0;
 
-  auto antennaGainH = std::find_if(
+  auto itHPlane = std::find_if(
     std::begin(this->radioConfig.hPlane), std::end(this->radioConfig.hPlane),
     [&](const auto& row) {
-      
-      return row.at(0) == angleOfRadiationH;
+      return row.at(0) == varphi;
     }
   );
 
-
-  if (antennaGainE == std::end(this->radioConfig.ePlane)) 
+  
+  if (itEPlane == std::end(this->radioConfig.ePlane) || itHPlane == std::end(this->radioConfig.hPlane)) 
   {
-    std::cout << "Out of Range..." << std::endl;
+    return -std::numeric_limits<double>::infinity();
   }
 
+  const double attenuationE = maxAntennaGain - this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1];
+  const double attenuationH = maxAntennaGain - this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1];
 
-  return varphi;
+  return maxAntennaGain - attenuationE - attenuationH;
 }
 
 ////////////////////////////////////////////
@@ -510,10 +512,6 @@ RFPower RFComms_custom::Implementation::LogNormalReceivedPower(
   const RadioState &_rxState) const
 {
   const double kRange = _txState.pose.Pos().Distance(_rxState.pose.Pos());
-
-  const double txAntennaGain = this->PostionsToAntennaGain(_txState, _rxState);
-
-  // const double rxAnntennaGain = this->PostionsToAntennaGain(_rxState, _txState);
 
   if (this->rangeConfig.maxRange > 0.0 && kRange > this->rangeConfig.maxRange) // 通信可能範囲外の場合
     return {-std::numeric_limits<double>::infinity(), 0.0};
@@ -615,6 +613,9 @@ std::tuple<bool, double, double, double, double> RFComms_custom::Implementation:
   
   // auto rxPowerDist =
   //   this->BasedOn3gppR16ReceivedPower(this->radioConfig.txPower, _txState, _rxState);
+
+  const double txAntennaGain = this->PoseToGain(_txState, _rxState, this->radioConfig.maxAntennaGain);
+  // const double rxAnntennaGain = this->PoseToGain(_rxState, _txState, this->radioConfig.maxAntennaGain);
 
   double rxPower = rxPowerDist.mean;
   if (rxPowerDist.variance > 0.0)
@@ -747,26 +748,21 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
     
     this->dataPtr->radioConfig.ePlane = 
       this->dataPtr->FileToArray(this->dataPtr->radioConfig.antennaGainsDirPath + "e_plane.csv");
+    double maxGainEPlane = -std::numeric_limits<double>::infinity();
+    for (const auto& row : this->dataPtr->radioConfig.ePlane)
+    {
+      maxGainEPlane = std::max(maxGainEPlane, row[1]);
+    }
 
     this->dataPtr->radioConfig.hPlane = 
       this->dataPtr->FileToArray(this->dataPtr->radioConfig.antennaGainsDirPath + "h_plane.csv");
-
-    // this->dataPtr->radioConfig.txVarphi =
-    //   elem->Get<std::string>("tx_varphi",
-    //     this->dataPtr->radioConfig.txVarphi).first;
-    
-    // this->dataPtr->radioConfig.txTheta =
-    //   elem->Get<std::string>("tx_theta",
-    //     this->dataPtr->radioConfig.txTheta).first;
-    
-    // this->dataPtr->radioConfig.rxVarphi =
-    //   elem->Get<std::string>("rx_varphi",
-    //     this->dataPtr->radioConfig.rxVarphi).first;
-                                                                                                                                                                                                                                                                                                                                                                                                           
-    // this->dataPtr->radioConfig.rxTheta =
-    //   elem->Get<std::string>("rx_Theta",
-    //     this->dataPtr->radioConfig.rxVarphi).first;
-
+    double maxGainHPlane = -std::numeric_limits<double>::infinity();
+    for (const auto& row : this->dataPtr->radioConfig.hPlane)
+    {
+      maxGainHPlane = std::max(maxGainHPlane, row[1]);
+    }
+  
+    this->dataPtr->radioConfig.maxAntennaGain = (maxGainHPlane + maxGainEPlane)/2; // 各面の最大値の平均 
   }
 
   // Generate  files
@@ -818,6 +814,15 @@ void RFComms_custom::Step(
       this->dataPtr->radioStates[address].timeStamp =
         std::chrono::duration<double>(_info.simTime).count();
       this->dataPtr->radioStates[address].name = content.modelName;
+
+      // if (this->dataPtr->radioStates[address].name == "ugv")
+      // {
+      //   this->dataPtr->radioStates[address].antennaRot = kPose.Rot() * this->dataPtr->radioConfig.rxAntennaRot;
+      // }
+      // else 
+      // {
+      //   this->dataPtr->radioStates[address].antennaRot = kPose.Rot() * this->dataPtr->radioConfig.txAntennaRot;
+      // }
     }
   }
 
