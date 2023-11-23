@@ -34,7 +34,7 @@ static std::atomic<bool> g_terminatePub(false);
 /// \brief Usage function.
 void usage()
 {
-  std::cerr << "./publisher <dst_address>" << std::endl;
+  std::cerr << "./publisher <src_address>" << std::endl;
 }
 
 //////////////////////////////////////////////////
@@ -75,8 +75,9 @@ int main(int argc, char **argv)
 
   // Prepare the message.
   ignition::msgs::Dataframe msg;
-  msg.set_src_address("base_station_1");
-  msg.set_dst_address(argv[1]);
+
+  msg.set_src_address(argv[1]);
+  msg.set_dst_address("ugv");
 
   // Publish messages at 1Hz.
   int counter = 0;
@@ -99,7 +100,7 @@ int main(int argc, char **argv)
     ++counter;
 
     std::cout << "Publishing hello on topic [" << topic << "]" << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
   return 0;

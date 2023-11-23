@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/haruki/Desktop/ugv_comms_in_gazebo/model/comms/publisher.cc" "CMakeFiles/publisher.dir/publisher.cc.o" "gcc" "CMakeFiles/publisher.dir/publisher.cc.o.d"
+  "/home/haruki/Desktop/ugv_comms_in_gazebo/src/comms/publisher.cc" "CMakeFiles/publisher.dir/publisher.cc.o" "gcc" "CMakeFiles/publisher.dir/publisher.cc.o.d"
   )
 
 # Targets to which this target links.

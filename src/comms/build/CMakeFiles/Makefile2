@@ -54,10 +54,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/haruki/Desktop/ugv_comms_in_gazebo/model/comms
+CMAKE_SOURCE_DIR = /home/haruki/Desktop/ugv_comms_in_gazebo/src/comms
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/haruki/Desktop/ugv_comms_in_gazebo/model/comms/build
+CMAKE_BINARY_DIR = /home/haruki/Desktop/ugv_comms_in_gazebo/src/comms/build
 
 #=============================================================================
 # Directory level rules for the build root directory
@@ -81,14 +81,14 @@ clean: CMakeFiles/publisher.dir/clean
 CMakeFiles/publisher.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/publisher.dir/build.make CMakeFiles/publisher.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/publisher.dir/build.make CMakeFiles/publisher.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/haruki/Desktop/ugv_comms_in_gazebo/model/comms/build/CMakeFiles --progress-num=1,2 "Built target publisher"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/haruki/Desktop/ugv_comms_in_gazebo/src/comms/build/CMakeFiles --progress-num=1,2 "Built target publisher"
 .PHONY : CMakeFiles/publisher.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/publisher.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/haruki/Desktop/ugv_comms_in_gazebo/model/comms/build/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/haruki/Desktop/ugv_comms_in_gazebo/src/comms/build/CMakeFiles 2
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/publisher.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/haruki/Desktop/ugv_comms_in_gazebo/model/comms/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/haruki/Desktop/ugv_comms_in_gazebo/src/comms/build/CMakeFiles 0
 .PHONY : CMakeFiles/publisher.dir/rule
 
 # Convenience name for target.

@@ -3,7 +3,7 @@
   Ignition Gazebo rfcomms customaized plugin.
 
   Compile the comms publisher:
-    cd model/comms
+    cd src/comms
     mkdir build
     cd build
     cmake ..
@@ -12,8 +12,8 @@
   Try launching a comms subscriber:
     ign topic -e -t ugv/rx
 
-  Try launching a comms publisher:
-    ./publisher ugv
+  Try launching a comms publisher example:
+    ./publisher base_station_1
 -->
 <sdf version="1.6">
   <world name="rf_comms">
@@ -44,15 +44,17 @@
         <max_range>500.0</max_range>
         <fading_exponent>2.0</fading_exponent>
         <l0>68</l0>
-        <sigma>0.0</sigma>
+        <sigma>3.0</sigma>
       </range_config>
       <radio_config>
         <center_frequency>600000000</center_frequency>
         <capacity>600000000</capacity>
-        <tx_power>22.5</tx_power>
+        <tx_power>-10</tx_power>
         <noise_floor>-90</noise_floor>
         <modulation>QPSK</modulation>
         <antenna_gains_dir_path>/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains/</antenna_gains_dir_path> 
+        <!-- <tx_antenna_rot>M_PI/2 0 -3*M_PI/4</tx_antenna_rot> -->
+        <!-- <rx_antenna_rot>M_PI/2 0 M_PI/4</rx_antenna_rot> -->
       </radio_config>
     </plugin>
 
@@ -144,7 +146,7 @@
 
     <model name="base_station_2">
       <static>true</static>
-      <pose>400 3 0.5 0 0 0</pose>
+      <pose>25 3 0.5 0 0 0</pose>
       <link name="base_station_link">
         <inertial>
           <inertia>

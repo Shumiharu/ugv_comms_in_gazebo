@@ -140,7 +140,7 @@ struct RadioConfiguration
   /// \brief holizontal antenna direction gain.
   std::vector<std::vector<double>> hPlane;
 
-  ignition::math::Quaterniond txAntennaRot = ignition::math::Quaterniond(M_PI/2, 0., M_PI/4);
+  ignition::math::Quaterniond txAntennaRot = ignition::math::Quaterniond(M_PI/2, 0., -3*M_PI/4);
 
   ignition::math::Quaterniond rxAntennaRot = ignition::math::Quaterniond(M_PI/2, 0., M_PI/4);
 
@@ -358,30 +358,23 @@ double RFComms_custom::Implementation::DbmToPow(double _dBm) const
 double RFComms_custom::Implementation::PoseToGain(
   const RadioState &_initialPointState,
   const RadioState &_terminalPointState,
-  // ignition::math::Pose3 &_initialPointPose,
-  // ignition::math::Pose3 &_terminalPointState.pose,
-  // ignition::math::Quaterniond &_initialAntennaRot,
   const double maxAntennaGain) const
 {
-  // auto antennaRot = _terminalPointState.pose.Rot();
-  // antennaRot *= ignition::math::Quaterniond(this->radioConfig.rxAntennaRot.Roll(), 0.0, 0.0);
-  // auto antennaRot = _terminalPointState.pose.Rot() * ignition::math::Quaterniond(this->radioConfig.rxAntennaRot.Roll(), 0.0, 0.0);
-  auto antennaRot = _terminalPointState.pose.Rot() * this->radioConfig.rxAntennaRot;
-  std::cout << antennaRot << std::endl;
-  auto refDirection = antennaRot.RotateVectorReverse(_initialPointState.pose.Pos() - _terminalPointState.pose.Pos());
-  std::cout << refDirection << std::endl;
-  auto refDirectionE = refDirection;
-  refDirectionE.Y(0.0);
-  double theta = round((this->RadianToDegree(acos(refDirectionE.Normalized().Dot(ignition::math::Vector3d::UnitX))))*10.)/10.;
-  if (refDirectionE.Z() < 0.0)
+  auto direction = _initialPointState.antennaRot.RotateVectorReverse(_terminalPointState.pose.Pos() - _initialPointState.pose.Pos());
+  
+  // igndbg << "direction: " << direction << " [" << _initialPointState.name << "]" << std::endl;
+
+  auto eDirection = direction;
+  eDirection.Y(0.0);
+
+  // igndbg << eDirection << std::endl;
+
+  double theta = round((this->RadianToDegree(acos(eDirection.Normalized().Dot(ignition::math::Vector3d::UnitX))))*10.)/10.;
+  if (eDirection.Z() < 0.0)
   {
     theta = -theta;
   }
 
-  std::cout << "theta: " << theta << std::endl;
-
-  // double angleOfRadiationE = round((this->RadianToDegree(theta - this->radioConfig.rxAntennaRot.Pitch()))*10.0)/10.0;
-  // double angleOfRadiationE = round((this->RadianToDegree(theta))*10.0)/10.0;
   auto itEPlane = std::find_if(
     std::begin(this->radioConfig.ePlane), std::end(this->radioConfig.ePlane),
     [&](const auto& row) {
@@ -389,18 +382,16 @@ double RFComms_custom::Implementation::PoseToGain(
     }
   );
 
-  auto refDirectionH = refDirection;
-  refDirectionH.Z(0.0);
-  double varphi = round(this->RadianToDegree(acos(refDirectionH.Normalized().Dot(ignition::math::Vector3d::UnitX)))*10.)/10.;
-  if (refDirectionH.Y() < 0.0)
+  auto hDirection = direction;
+  hDirection.Z(0.0);
+
+  // igndbg << hDirection << std::endl;
+
+  double varphi = round(this->RadianToDegree(acos(hDirection.Normalized().Dot(ignition::math::Vector3d::UnitX)))*10.)/10.;
+  if (hDirection.Y() < 0.0)
   {
     varphi = -varphi;
   }
-
-  std::cout << "varphi: " << varphi << std::endl;
-
-  // double angleOfRadiationH = round(this->RadianToDegree(varphi - this->radioConfig.rxAntennaRot.Yaw())*10.0)/10.0;
-  // double angleOfRadiationH = round(this->RadianToDegree(varphi)*10.0)/10.0;
 
   auto itHPlane = std::find_if(
     std::begin(this->radioConfig.hPlane), std::end(this->radioConfig.hPlane),
@@ -409,16 +400,22 @@ double RFComms_custom::Implementation::PoseToGain(
     }
   );
 
-  
   if (itEPlane == std::end(this->radioConfig.ePlane) || itHPlane == std::end(this->radioConfig.hPlane)) 
   {
     return -std::numeric_limits<double>::infinity();
   }
 
-  const double attenuationE = maxAntennaGain - this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1];
-  const double attenuationH = maxAntennaGain - this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1];
+  const double antennaGain = this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1]
+                             + this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1]
+                             - maxAntennaGain; // 半値角から考えるのであれば maxAntennaGain->10log10(M_PI)??
 
-  return maxAntennaGain - attenuationE - attenuationH;
+  igndbg << "[" << _initialPointState.name << "]" << std::endl;
+  igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
+  igndbg << "AntennaGain(E-Plane): " << this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1] << std::endl;
+  igndbg << "AntennaGain(H-Plane): " << this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1] << std::endl;
+  igndbg << "AntennaGain3d: " << antennaGain << std::endl;
+                            
+  return antennaGain;
 }
 
 ////////////////////////////////////////////
@@ -604,18 +601,19 @@ std::tuple<bool, double, double, double, double> RFComms_custom::Implementation:
   _txState.bytesSent.push_back(std::make_pair(now, _numBytes));
   _txState.bytesSentThisEpoch += _numBytes;
 
+  // Get each antenna gain based on the angle of radiation/arrival.
+  const double txAntennaGain = this->PoseToGain(_txState, _rxState, this->radioConfig.maxAntennaGain);
+  const double rxAnntennaGain = this->PoseToGain(_rxState, _txState, this->radioConfig.maxAntennaGain);
+
   // Get the received power based on TX power and position of each node.
   // auto rxPowerDist =
   //   this->FreeSpaceReceivedPower(this->radioConfig.txPower, _txState, _rxState);
 
   auto rxPowerDist =
-    this->LogNormalReceivedPower(this->radioConfig.txPower, _txState, _rxState);
+    this->LogNormalReceivedPower(this->radioConfig.txPower + txAntennaGain + rxAnntennaGain, _txState, _rxState);
   
   // auto rxPowerDist =
   //   this->BasedOn3gppR16ReceivedPower(this->radioConfig.txPower, _txState, _rxState);
-
-  const double txAntennaGain = this->PoseToGain(_txState, _rxState, this->radioConfig.maxAntennaGain);
-  // const double rxAnntennaGain = this->PoseToGain(_rxState, _txState, this->radioConfig.maxAntennaGain);
 
   double rxPower = rxPowerDist.mean;
   if (rxPowerDist.variance > 0.0)
@@ -762,13 +760,22 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
       maxGainHPlane = std::max(maxGainHPlane, row[1]);
     }
   
-    this->dataPtr->radioConfig.maxAntennaGain = (maxGainHPlane + maxGainEPlane)/2; // 各面の最大値の平均 
+    this->dataPtr->radioConfig.maxAntennaGain = (maxGainHPlane + maxGainEPlane)/2.; // 各面の最大値の平均 
+
+    // this->dataPtr->radioConfig.txAntennaRot =
+    //   elem->Get<ignition::math::Quaterniond>("tx_antenna_rot",
+    //     this->dataPtr->radioConfig.txAntennaRot).first;
+
+    // this->dataPtr->radioConfig.rxAntennaRot =
+    //   elem->Get<ignition::math::Quaterniond>("rx_antenna_rot",
+    //     this->dataPtr->radioConfig.rxAntennaRot).first;
+        
   }
 
   // Generate  files
   std::string commsAnalysisFilePath = this->dataPtr->fileConfig.commsAnalysisDirPath + this->dataPtr->fileConfig.currentDateTime() + ".csv";
   this->dataPtr->writing_file.open(commsAnalysisFilePath, std::ios::out);
-  this->dataPtr->writing_file << "X(m),Y(m),Z(m),Distance_BS_1,RSSI,BER,PER,Throughput(Gbps)" << std::endl;
+  this->dataPtr->writing_file << "X[m],Y[m],Z[m],From,RSSI[dBm],Throughput[Gbps]" << std::endl;
 
   igndbg << "File configuration:" << std::endl
          << this->dataPtr->fileConfig << std::endl;
@@ -788,6 +795,8 @@ void RFComms_custom::Step(
       comms::Registry &_newRegistry,
       EntityComponentManager &_ecm)
 {
+  
+
   // Update ratio states.
   for (auto & [address, content] : _currentRegistry)
   {
@@ -815,36 +824,41 @@ void RFComms_custom::Step(
         std::chrono::duration<double>(_info.simTime).count();
       this->dataPtr->radioStates[address].name = content.modelName;
 
-      // if (this->dataPtr->radioStates[address].name == "ugv")
-      // {
-      //   this->dataPtr->radioStates[address].antennaRot = kPose.Rot() * this->dataPtr->radioConfig.rxAntennaRot;
-      // }
-      // else 
-      // {
-      //   this->dataPtr->radioStates[address].antennaRot = kPose.Rot() * this->dataPtr->radioConfig.txAntennaRot;
-      // }
+      if (this->dataPtr->radioStates[address].name == "ugv")
+      {
+        this->dataPtr->radioStates[address].antennaRot = kPose.Rot() * this->dataPtr->radioConfig.rxAntennaRot;
+      }
+      else 
+      {
+        this->dataPtr->radioStates[address].antennaRot = kPose.Rot() * this->dataPtr->radioConfig.txAntennaRot;
+      }
     }
   }
+
+
 
   for (auto & [address, content] : _currentRegistry)
   {
     // Reference to the outbound queue for this address.
     auto &outbound = content.outboundMsgs;
 
-    // std::cout << this->dataPtr->radioStates[address].name << std::endl;
-
     // The source address needs to be attached to a robot.
     auto itSrc = this->dataPtr->radioStates.find(address);
     
+    
     if (itSrc != this->dataPtr->radioStates.end())
     {
+      
       // All these messages need to be processed.
       for (const auto &msg : outbound)
       {
         // The destination address needs to be attached to a robot.
         auto itDst = this->dataPtr->radioStates.find(msg->dst_address());
+        
         if (itDst == this->dataPtr->radioStates.end()) // if src is same as dst, pass the following process.
           continue;
+
+        
 
         auto [sendPacket, rssi, ber, per, throughput] = this->dataPtr->AttemptSend(
           itSrc->second, itDst->second, msg->data().size());
@@ -857,30 +871,26 @@ void RFComms_custom::Step(
           
           // Add rssi.
           auto *rssiPtr = inboundMsg->mutable_header()->add_data();
-          rssiPtr->set_key("rssi");
+          rssiPtr->set_key("RSSI in " + address);
           rssiPtr->add_value(std::to_string(rssi));
 
-          double x_ugv = this->dataPtr->radioStates[msg->dst_address()].pose.Pos()[0];
-          double y_ugv = this->dataPtr->radioStates[msg->dst_address()].pose.Pos()[1];
-          double z_ugv = this->dataPtr->radioStates[msg->dst_address()].pose.Pos()[2];
-          double distance_bs_1 = this->dataPtr->radioStates[msg->dst_address()].pose.Pos().Distance(this->dataPtr->radioStates[address].pose.Pos());
-          double distance_bs_2;
-
-          // Write postion of ugv
-          this->dataPtr->writing_file << x_ugv << "," << y_ugv << "," << z_ugv << "," << distance_bs_1 << ",";
-
-          // Write RSSI, BER and PER
-          this->dataPtr->writing_file << rssi << "," << ber << "," << per << "," << throughput << std::endl;
-
           _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
+
+          ignition::math::Pose3 ugvPose = this->dataPtr->radioStates[msg->dst_address()].pose;
+          this->dataPtr->writing_file << ugvPose.Pos().X() << ","
+                                      << ugvPose.Pos().Y() << ","
+                                      << ugvPose.Pos().Z() << ","
+                                      << address << ","
+                                      << rssi << "," 
+                                      << throughput << std::endl;
         }
       }
     }
-
     // Clear the outbound queue.
     _newRegistry[address].outboundMsgs.clear();
   }
 }
+
 IGNITION_ADD_PLUGIN(RFComms_custom,
                     ignition::gazebo::System,
                     comms::ICommsModel::ISystemConfigure,
