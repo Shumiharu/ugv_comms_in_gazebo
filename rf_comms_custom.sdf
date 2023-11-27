@@ -116,17 +116,19 @@
         </inertial>
         <collision name="base_station_collision">
           <geometry>
-            <box>
-              <size>1 1 1</size>
-            </box>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
           </geometry>
         </collision>
 
         <visual name="base_station_visual">
           <geometry>
-            <box>
-              <size>1 1 1</size>
-            </box>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
           </geometry>
           <material>
             <ambient>1 0 0 1</ambient>
@@ -161,17 +163,19 @@
         </inertial>
         <collision name="base_station_collision">
           <geometry>
-            <box>
-              <size>1 1 1</size>
-            </box>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
           </geometry>
         </collision>
 
         <visual name="base_station_visual">
           <geometry>
-            <box>
-              <size>1 1 1</size>
-            </box>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
           </geometry>
           <material>
             <ambient>1 0 0 1</ambient>

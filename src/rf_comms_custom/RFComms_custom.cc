@@ -231,12 +231,16 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
                                                RadioState &_rxState,
                                                const uint64_t &_numBytes);
 
+  public: std::vector<double> RssiToSnr(std::vector<double> _rssi, const uint64_t &_numBytes);
+  
+  public: double AttemptMeasure(RadioState &_txState,
+                                RadioState &_rxState);
+
   /// \brief Convert from e_plane.csv and h_plane.csv to two dimensional array.
   public: std::vector<std::vector<double>> FileToArray(std::string _filePath) const;
 
   private: double PoseToGain(const RadioState &_initialPointState,
-                             const RadioState &_terminalPointState,
-                             const double maxAntennaGain) const;
+                             const RadioState &_terminalPointState) const;
 
   /// \brief Convert degree to radian.
   public: double DegreeToRadian(double _degree) const;
@@ -357,8 +361,7 @@ double RFComms_custom::Implementation::DbmToPow(double _dBm) const
 /////////////////////////////////////////////
 double RFComms_custom::Implementation::PoseToGain(
   const RadioState &_initialPointState,
-  const RadioState &_terminalPointState,
-  const double maxAntennaGain) const
+  const RadioState &_terminalPointState) const
 {
   auto direction = _initialPointState.antennaRot.RotateVectorReverse(_terminalPointState.pose.Pos() - _initialPointState.pose.Pos());
   
@@ -407,7 +410,7 @@ double RFComms_custom::Implementation::PoseToGain(
 
   const double antennaGain = this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1]
                              + this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1]
-                             - maxAntennaGain; // 半値角から考えるのであれば maxAntennaGain->10log10(M_PI)??
+                             - this->radioConfig.maxAntennaGain; // 半値角から考えるのであれば maxAntennaGain->10log10(M_PI)??
 
   igndbg << "[" << _initialPointState.name << "]" << std::endl;
   igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
@@ -602,8 +605,8 @@ std::tuple<bool, double, double, double, double> RFComms_custom::Implementation:
   _txState.bytesSentThisEpoch += _numBytes;
 
   // Get each antenna gain based on the angle of radiation/arrival.
-  const double txAntennaGain = this->PoseToGain(_txState, _rxState, this->radioConfig.maxAntennaGain);
-  const double rxAnntennaGain = this->PoseToGain(_rxState, _txState, this->radioConfig.maxAntennaGain);
+  const double txAntennaGain = this->PoseToGain(_txState, _rxState);
+  const double rxAnntennaGain = this->PoseToGain(_rxState, _txState);
 
   // Get the received power based on TX power and position of each node.
   // auto rxPowerDist =
@@ -678,6 +681,39 @@ std::tuple<bool, double, double, double, double> RFComms_custom::Implementation:
   _rxState.bytesReceivedThisEpoch += _numBytes;
 
   return std::make_tuple(true, rxPower, ber, packetDropProb, throughput);
+}
+
+double RFComms_custom::Implementation::AttemptMeasure(
+  RadioState &_txState, RadioState &_rxState)
+{
+  const double txAntennaGain = this->PoseToGain(_txState, _rxState);
+  
+  auto rxPowerDist =
+  this->LogNormalReceivedPower(this->radioConfig.txPower + txAntennaGain, _txState, _rxState);
+
+  // auto rxPowerDist =
+  //   this->BasedOn3gppR16ReceivedPower(this->radioConfig.txPower, _txState, _rxState);
+
+  double rxPower = rxPowerDist.mean;
+  if (rxPowerDist.variance > 0.0)
+  {
+    std::normal_distribution<> d{rxPowerDist.mean, sqrt(rxPowerDist.variance)};
+    rxPower = d(this->rndEngine);
+  }
+
+  const double rxAnntennaGain = this->PoseToGain(_rxState, _txState);
+
+  return rxPower + rxAnntennaGain;
+}
+
+std::vector<double> RFComms_custom::Implementation::RssiToSnr(
+  std::vector<double> _rssi, const uint64_t &_numBytes)
+{
+  double noiseFloor = this->radioConfig.noiseFloor*this->radioConfig.capacity;
+  for (auto &e : _rssi)
+  {
+    if ()
+  }
 }
 
 //////////////////////////////////////////////////
@@ -775,7 +811,7 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
   // Generate  files
   std::string commsAnalysisFilePath = this->dataPtr->fileConfig.commsAnalysisDirPath + this->dataPtr->fileConfig.currentDateTime() + ".csv";
   this->dataPtr->writing_file.open(commsAnalysisFilePath, std::ios::out);
-  this->dataPtr->writing_file << "X[m],Y[m],Z[m],From,RSSI[dBm],Throughput[Gbps]" << std::endl;
+  this->dataPtr->writing_file << "X[m],Y[m],Z[m],From,RSSI[dBm],SNR[dB],Throughput[Gbps]" << std::endl;
 
   igndbg << "File configuration:" << std::endl
          << this->dataPtr->fileConfig << std::endl;
@@ -795,8 +831,6 @@ void RFComms_custom::Step(
       comms::Registry &_newRegistry,
       EntityComponentManager &_ecm)
 {
-  
-
   // Update ratio states.
   for (auto & [address, content] : _currentRegistry)
   {
@@ -835,21 +869,21 @@ void RFComms_custom::Step(
     }
   }
 
-
+  int i = 0;
+  double txAntennaGain;
+  double rxAntennaGain;
+  std::vector<double> rssi(2);
 
   for (auto & [address, content] : _currentRegistry)
   {
     // Reference to the outbound queue for this address.
     auto &outbound = content.outboundMsgs;
-
     // The source address needs to be attached to a robot.
-    auto itSrc = this->dataPtr->radioStates.find(address);
-    
-    
+    auto itSrc = this->dataPtr->radioStates.find(address);   
     if (itSrc != this->dataPtr->radioStates.end())
     {
-      
       // All these messages need to be processed.
+
       for (const auto &msg : outbound)
       {
         // The destination address needs to be attached to a robot.
@@ -858,22 +892,38 @@ void RFComms_custom::Step(
         if (itDst == this->dataPtr->radioStates.end()) // if src is same as dst, pass the following process.
           continue;
 
+        rssi[i] = this->dataPtr->AttemptMeasure(itSrc->second, itDst->second);
         
+        auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
 
-        auto [sendPacket, rssi, ber, per, throughput] = this->dataPtr->AttemptSend(
-          itSrc->second, itDst->second, msg->data().size());
+        // Add rssi.
+        auto *rssiPtr = inboundMsg->mutable_header()->add_data();
+        rssiPtr->set_key("RSSI from " + address);
+        rssiPtr->add_value(std::to_string(rssi[i]));
 
-        if (sendPacket)
+        _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
+        
+        ++i;
+      }
+
+      for (const auto &msg : outbound)
+      {
+        std::vector<double> SNR = this->dataPtr->RssiToSnr(rssi, msg->data().size());
+        auto [isSent, throughput] = {true, 0.1}; 
+        if (isSent)
         {
-          // We create a copy of the outbound message because each destination
-          // might have a different rssi value.
           auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
           
-          // Add rssi.
-          auto *rssiPtr = inboundMsg->mutable_header()->add_data();
-          rssiPtr->set_key("RSSI in " + address);
-          rssiPtr->add_value(std::to_string(rssi));
+          // Add SNR.
+          auto *snrPtr = inboundMsg->mutable_header()->add_data();
+          snrPtr->set_key("SNR");
+          snrPtr->add_value(std::to_string(SNR[i]));
 
+          // Add throughput.
+          auto *snrPtr = inboundMsg->mutable_header()->add_data();
+          snrPtr->set_key("Throughput");
+          snrPtr->add_value(std::to_string(SNR[i]));
+          
           _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
 
           ignition::math::Pose3 ugvPose = this->dataPtr->radioStates[msg->dst_address()].pose;
@@ -881,9 +931,11 @@ void RFComms_custom::Step(
                                       << ugvPose.Pos().Y() << ","
                                       << ugvPose.Pos().Z() << ","
                                       << address << ","
-                                      << rssi << "," 
-                                      << throughput << std::endl;
-        }
+                                      << rssi[i] << ","
+                                      << SNR[i] << ","
+                                      << throughput << ","
+                                      << std::endl;
+        } 
       }
     }
     // Clear the outbound queue.

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <ignition version='1.0'>
   <executable name='gazebo-server'>
-    <command>ign gazebo rf_comms_custom.sdf</command> 
+    <command>ign gazebo -v5 rf_comms_custom.sdf</command> 
   </executable>
 
   <executable name='publish-bs1'>
