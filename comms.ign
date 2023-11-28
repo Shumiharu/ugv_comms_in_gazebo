@@ -16,13 +16,13 @@
     <command>./src/comms/build/publisher base_station_3 </command>
   </executable>
 
-  <executable name='publish-bs4'>
+  <!-- <executable name='publish-bs4'>
     <command>./src/comms/build/publisher base_station_4 </command>
-  </executable>
+  </executable> -->
 
-  <executable name='publish-bs5'>
+  <!-- <executable name='publish-bs5'>
     <command>./src/comms/build/publisher base_station_5 </command>
-  </executable>
+  </executable> -->
 
   <executable name='topic-ugv'>
     <command>ign topic -e -t ugv/rx</command>

@@ -717,7 +717,7 @@ std::tuple<bool, double> RFComms_custom::Implementation::AttemptSend2(
 double RFComms_custom::Implementation::RssiToSnr(
   int i, std::vector<double> _eachRssi)
 {
-  double noiseFloor= this->DbmToPow(this->radioConfig.thermalNoiseDensity*this->radioConfig.capacity);
+  double noiseFloor= this->DbmToPow(this->radioConfig.thermalNoiseDensity)*this->radioConfig.capacity;
 
   double interferencePower = 0.0;
   for (auto &_otherRssi : _eachRssi)
