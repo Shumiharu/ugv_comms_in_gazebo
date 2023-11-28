@@ -80,6 +80,15 @@ sudo cp ./libRFComms_custom.so /usr/lib/x86_64-linux-gnu/ign-gazebo-6/plugins/.
 ```
 
 ## Gazebo Fortressを起動する
+
+rf_comms pluginのパラメータの読み込み先ファイルパス（絶対パス）をそれぞれ変更してください。相対パスで読み込める方法あれば連絡ください
+
+comms_analysisタグ
+/home/haruki/Desktop/ugv_comms_in_gazebo/comms_analysis/ -> （任意のフォルダ）/ugv_comms_in_gazebo/comms_analysis/
+
+antenna_gains_dir_pathタグ
+/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains/　-> （任意のフォルダ）/ugv_comms_in_gazebo/antenna_gains/
+
 ```
 ign gazebo rf_comms_custom.sdf
 ```
@@ -102,4 +111,9 @@ make
 ## 受信
 ```
 ign topic -e -t ugv/rx
+```
+
+## 上記のプログラムを一斉に立ち上げる
+```
+ign launch comms.ign worldName:=rf_comms_custom
 ```

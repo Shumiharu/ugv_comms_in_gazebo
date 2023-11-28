@@ -120,16 +120,16 @@ struct RadioConfiguration
   double centerFrequency = 60.0;
   
   /// \brief Capacity of radio in bits-per-second.
-  double capacity = 54000000;
+  double capacity = 2.16 * pow(10.0, 9.0);
 
   /// \brief Default transmit power in dBm. Default is 27dBm or 500mW.
-  double txPower = 27;
+  double txPower = -10.0;
 
   /// \brief Modulation scheme, e.g., QPSK (Quadrature Phase Shift Keyring).
   std::string modulation = "QPSK";
 
   /// \brief Noise floor of the radio in dBm.
-  double noiseFloor = -90;
+  double thermalNoiseDensity = -147.0;
 
   /// \brief Directly Path of horn antenna gains.
   std::string antennaGainsDirPath = "/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains";
@@ -156,7 +156,7 @@ struct RadioConfiguration
          << "-- center_frequency: " << _config.centerFrequency << std::endl
          << "-- capacity: " << _config.capacity << std::endl
          << "-- tx_power: " << _config.txPower << std::endl
-         << "-- noise_floor: " << _config.noiseFloor << std::endl
+         << "-- thermal_noise_density: " << _config.thermalNoiseDensity << std::endl
          << "-- modulation: " << _config.modulation << std::endl;
 
     return _oss;
@@ -231,10 +231,12 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
                                                RadioState &_rxState,
                                                const uint64_t &_numBytes);
 
-  public: std::vector<double> RssiToSnr(std::vector<double> _rssi, const uint64_t &_numBytes);
+  public: double RssiToSnr(int i, std::vector<double> _eachRssi);
   
   public: double AttemptMeasure(RadioState &_txState,
                                 RadioState &_rxState);
+
+  public: std::tuple<bool, double> AttemptSend2(std::vector<double> &_SINR, const uint64_t &_numBytes);
 
   /// \brief Convert from e_plane.csv and h_plane.csv to two dimensional array.
   public: std::vector<std::vector<double>> FileToArray(std::string _filePath) const;
@@ -412,11 +414,11 @@ double RFComms_custom::Implementation::PoseToGain(
                              + this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1]
                              - this->radioConfig.maxAntennaGain; // 半値角から考えるのであれば maxAntennaGain->10log10(M_PI)??
 
-  igndbg << "[" << _initialPointState.name << "]" << std::endl;
-  igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
-  igndbg << "AntennaGain(E-Plane): " << this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1] << std::endl;
-  igndbg << "AntennaGain(H-Plane): " << this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1] << std::endl;
-  igndbg << "AntennaGain3d: " << antennaGain << std::endl;
+  // igndbg << "[" << _initialPointState.name << "]" << std::endl;
+  // igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
+  // igndbg << "AntennaGain(E-Plane): " << this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1] << std::endl;
+  // igndbg << "AntennaGain(H-Plane): " << this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1] << std::endl;
+  // igndbg << "AntennaGain3d: " << antennaGain << std::endl;
                             
   return antennaGain;
 }
@@ -628,10 +630,10 @@ std::tuple<bool, double, double, double, double> RFComms_custom::Implementation:
   // Based on rx_power, noise value, and modulation, compute the bit
   // error rate (BER).
   double ber = this->QPSKPowerToBER(
-    this->DbmToPow(rxPower), this->DbmToPow(this->radioConfig.noiseFloor));
+    this->DbmToPow(rxPower), this->DbmToPow(this->radioConfig.thermalNoiseDensity));
 
   // double ber = this->PowerToBER(
-  //   this->DbmToPow(rxPower), this->DbmToPow(this->radioConfig.noiseFloor), this->radioConfig.modulation);
+  //   this->DbmToPow(rxPower), this->DbmToPow(this->radioConfig.thermalNoiseDensity), this->radioConfig.modulation);
 
   double packetDropProb = 1.0 - exp(_numBytes * log(1 - ber));
 
@@ -706,14 +708,32 @@ double RFComms_custom::Implementation::AttemptMeasure(
   return rxPower + rxAnntennaGain;
 }
 
-std::vector<double> RFComms_custom::Implementation::RssiToSnr(
-  std::vector<double> _rssi, const uint64_t &_numBytes)
+std::tuple<bool, double> RFComms_custom::Implementation::AttemptSend2(
+  std::vector<double> &_SINR, const uint64_t &_numBytes)
 {
-  double noiseFloor = this->radioConfig.noiseFloor*this->radioConfig.capacity;
-  for (auto &e : _rssi)
+  return std::make_tuple(true, 0.1);
+}
+
+double RFComms_custom::Implementation::RssiToSnr(
+  int i, std::vector<double> _eachRssi)
+{
+  double noiseFloor= this->DbmToPow(this->radioConfig.thermalNoiseDensity*this->radioConfig.capacity);
+
+  double interferencePower = 0.0;
+  for (auto &_otherRssi : _eachRssi)
   {
-    if ()
+    if (_eachRssi[i] != _otherRssi)
+      interferencePower += this->DbmToPow(_otherRssi);
   }
+
+  igndbg << "interference_power[mW]: " << interferencePower << std::endl;
+  igndbg << "noiseFloor[mW]: " << noiseFloor << std::endl;
+
+  double SINR = 10*log10(this->DbmToPow(_eachRssi[i])/(noiseFloor + interferencePower));
+
+  igndbg << "SINR[dB]: " << SINR << std::endl;
+
+  return SINR;
 }
 
 //////////////////////////////////////////////////
@@ -772,9 +792,9 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
       elem->Get<std::string>("modulation",
         this->dataPtr->radioConfig.modulation).first;
 
-    this->dataPtr->radioConfig.noiseFloor =
-      elem->Get<double>("noise_floor",
-        this->dataPtr->radioConfig.noiseFloor).first;
+    this->dataPtr->radioConfig.thermalNoiseDensity =
+      elem->Get<double>("thermal_noise_density",
+        this->dataPtr->radioConfig.thermalNoiseDensity).first;
 
     this->dataPtr->radioConfig.antennaGainsDirPath =
       elem->Get<std::string>("antenna_gains_dir_path",
@@ -811,7 +831,7 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
   // Generate  files
   std::string commsAnalysisFilePath = this->dataPtr->fileConfig.commsAnalysisDirPath + this->dataPtr->fileConfig.currentDateTime() + ".csv";
   this->dataPtr->writing_file.open(commsAnalysisFilePath, std::ios::out);
-  this->dataPtr->writing_file << "X[m],Y[m],Z[m],From,RSSI[dBm],SNR[dB],Throughput[Gbps]" << std::endl;
+  this->dataPtr->writing_file << "X[m],Y[m],Z[m],From,RSSI[dBm],SINR[dB],Throughput[Gbps]" << std::endl;
 
   igndbg << "File configuration:" << std::endl
          << this->dataPtr->fileConfig << std::endl;
@@ -869,11 +889,8 @@ void RFComms_custom::Step(
     }
   }
 
-  int i = 0;
-  double txAntennaGain;
-  double rxAntennaGain;
-  std::vector<double> rssi(2);
-
+  int i = 0, j = 0;
+  std::vector<double> eachRssi;
   for (auto & [address, content] : _currentRegistry)
   {
     // Reference to the outbound queue for this address.
@@ -883,59 +900,54 @@ void RFComms_custom::Step(
     if (itSrc != this->dataPtr->radioStates.end())
     {
       // All these messages need to be processed.
-
       for (const auto &msg : outbound)
       {
         // The destination address needs to be attached to a robot.
         auto itDst = this->dataPtr->radioStates.find(msg->dst_address());
-        
-        if (itDst == this->dataPtr->radioStates.end()) // if src is same as dst, pass the following process.
+        if (itDst == this->dataPtr->radioStates.end())
           continue;
+        double rssi = this->dataPtr->AttemptMeasure(itSrc->second, itDst->second);
+        eachRssi.push_back(rssi);
+        ++i;
+      }
+    }
+  }
 
-        rssi[i] = this->dataPtr->AttemptMeasure(itSrc->second, itDst->second);
+  for (auto & [address, content] : _currentRegistry)
+  {
+    auto &outbound = content.outboundMsgs;
+    auto itSrc = this->dataPtr->radioStates.find(address);   
+    if (itSrc != this->dataPtr->radioStates.end())
+    {
+      for (const auto &msg : outbound)
+      {
+        auto itDst = this->dataPtr->radioStates.find(msg->dst_address());
+        
+        if (itDst == this->dataPtr->radioStates.end())
+          continue;
+        
+        double SINR = this->dataPtr->RssiToSnr(j ,eachRssi);
         
         auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
 
-        // Add rssi.
-        auto *rssiPtr = inboundMsg->mutable_header()->add_data();
-        rssiPtr->set_key("RSSI from " + address);
-        rssiPtr->add_value(std::to_string(rssi[i]));
-
-        _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
+        // Add rssi and SINR.
+        auto *commsAnalysisPtr = inboundMsg->mutable_header()->add_data();
+        commsAnalysisPtr->set_key("RSSI/SINR: " + address);
+        commsAnalysisPtr->add_value(std::to_string(eachRssi[j]) + "/" + std::to_string(SINR));
         
-        ++i;
-      }
+        _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
 
-      for (const auto &msg : outbound)
-      {
-        std::vector<double> SNR = this->dataPtr->RssiToSnr(rssi, msg->data().size());
-        auto [isSent, throughput] = {true, 0.1}; 
-        if (isSent)
+        if (eachRssi[j] != -std::numeric_limits<double>::infinity())
         {
-          auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
-          
-          // Add SNR.
-          auto *snrPtr = inboundMsg->mutable_header()->add_data();
-          snrPtr->set_key("SNR");
-          snrPtr->add_value(std::to_string(SNR[i]));
-
-          // Add throughput.
-          auto *snrPtr = inboundMsg->mutable_header()->add_data();
-          snrPtr->set_key("Throughput");
-          snrPtr->add_value(std::to_string(SNR[i]));
-          
-          _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
-
           ignition::math::Pose3 ugvPose = this->dataPtr->radioStates[msg->dst_address()].pose;
           this->dataPtr->writing_file << ugvPose.Pos().X() << ","
                                       << ugvPose.Pos().Y() << ","
                                       << ugvPose.Pos().Z() << ","
                                       << address << ","
-                                      << rssi[i] << ","
-                                      << SNR[i] << ","
-                                      << throughput << ","
-                                      << std::endl;
-        } 
+                                      << eachRssi[j] << ","
+                                      << SINR << std::endl;
+        }
+        ++j;
       }
     }
     // Clear the outbound queue.

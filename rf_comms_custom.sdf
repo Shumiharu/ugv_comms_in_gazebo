@@ -44,13 +44,13 @@
         <max_range>500.0</max_range>
         <fading_exponent>2.0</fading_exponent>
         <l0>68</l0>
-        <sigma>3.0</sigma>
+        <sigma>0.0</sigma>
       </range_config>
       <radio_config>
         <center_frequency>600000000</center_frequency>
-        <capacity>600000000</capacity>
+        <capacity>2160000000</capacity>
         <tx_power>-10</tx_power>
-        <noise_floor>-90</noise_floor>
+        <thermal_noise_density>-174</thermal_noise_density>
         <modulation>QPSK</modulation>
         <antenna_gains_dir_path>/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains/</antenna_gains_dir_path> 
         <!-- <tx_antenna_rot>M_PI/2 0 -3*M_PI/4</tx_antenna_rot> -->
@@ -101,7 +101,7 @@
 
     <model name="base_station_1">
       <static>true</static>
-      <pose>20 3 0.5 0 0 0</pose> 
+      <pose>10 3 0.5 0 0 0</pose> 
       <link name="base_station_link">
         <inertial>
           <inertia>
@@ -148,7 +148,7 @@
 
     <model name="base_station_2">
       <static>true</static>
-      <pose>25 3 0.5 0 0 0</pose>
+      <pose>15 3 0.5 0 0 0</pose>
       <link name="base_station_link">
         <inertial>
           <inertia>
@@ -190,6 +190,147 @@
         name="ignition::gazebo::systems::CommsEndpoint">
         <address>base_station_2</address>
         <topic>base_station_2/rx</topic>
+      </plugin>
+    </model>
+
+    <model name="base_station_3">
+      <static>true</static>
+      <pose>20 3 0.5 0 0 0</pose>
+      <link name="base_station_link">
+        <inertial>
+          <inertia>
+            <ixx>0.16666</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.16666</iyy>
+            <iyz>0</iyz>
+            <izz>0.16666</izz>
+          </inertia>
+          <mass>1.0</mass>
+        </inertial>
+        <collision name="base_station_collision">
+          <geometry>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+        </collision>
+
+        <visual name="base_station_visual">
+          <geometry>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
+            <specular>1 0 0 1</specular>
+          </material>
+        </visual>
+      </link>
+
+      <plugin
+        filename="ignition-gazebo-comms-endpoint-system"
+        name="ignition::gazebo::systems::CommsEndpoint">
+        <address>base_station_3</address>
+        <topic>base_station_3/rx</topic>
+      </plugin>
+    </model>
+
+    <model name="base_station_4">
+      <static>true</static>
+      <pose>25 3 0.5 0 0 0</pose>
+      <link name="base_station_link">
+        <inertial>
+          <inertia>
+            <ixx>0.16666</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.16666</iyy>
+            <iyz>0</iyz>
+            <izz>0.16666</izz>
+          </inertia>
+          <mass>1.0</mass>
+        </inertial>
+        <collision name="base_station_collision">
+          <geometry>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+        </collision>
+
+        <visual name="base_station_visual">
+          <geometry>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
+            <specular>1 0 0 1</specular>
+          </material>
+        </visual>
+      </link>
+
+      <plugin
+        filename="ignition-gazebo-comms-endpoint-system"
+        name="ignition::gazebo::systems::CommsEndpoint">
+        <address>base_station_4</address>
+        <topic>base_station_4/rx</topic>
+      </plugin>
+    </model>
+
+    <model name="base_station_5">
+      <static>true</static>
+      <pose>30 3 0.5 0 0 0</pose>
+      <link name="base_station_link">
+        <inertial>
+          <inertia>
+            <ixx>0.16666</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.16666</iyy>
+            <iyz>0</iyz>
+            <izz>0.16666</izz>
+          </inertia>
+          <mass>1.0</mass>
+        </inertial>
+        <collision name="base_station_collision">
+          <geometry>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+        </collision>
+
+        <visual name="base_station_visual">
+          <geometry>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
+            <specular>1 0 0 1</specular>
+          </material>
+        </visual>
+      </link>
+
+      <plugin
+        filename="ignition-gazebo-comms-endpoint-system"
+        name="ignition::gazebo::systems::CommsEndpoint">
+        <address>base_station_5</address>
+        <topic>base_station_5/rx</topic>
       </plugin>
     </model>
 
@@ -536,7 +677,7 @@
             <match field="data">16777235</match>
         </input>
         <output type="ignition.msgs.Twist" topic="/cmd_vel">
-            linear: {x: 0.5}, angular: {z: 0.0}
+            linear: {x: 1.0}, angular: {z: 0.0}
         </output>
     </plugin>
 
@@ -547,7 +688,7 @@
             <match field="data">16777237</match>
         </input>
         <output type="ignition.msgs.Twist" topic="/cmd_vel">
-            linear: {x: -0.5}, angular: {z: 0.0}
+            linear: {x: -1.0}, angular: {z: 0.0}
         </output>
     </plugin>
 
