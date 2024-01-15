@@ -146,6 +146,8 @@ struct RadioConfiguration
 
   double maxAntennaGain;
 
+  std::vector<std::string> srcNodes;
+
   /// Output stream operator.
   /// \param _oss Stream.
   /// \param _config configuration to output.
@@ -231,12 +233,12 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
                                                RadioState &_rxState,
                                                const uint64_t &_numBytes);
 
-  public: double RssiToSnr(int i, std::vector<double> _eachRssi);
+  public: double RxPowerToSINR(int i, std::vector<double> _eachRSSI);
   
   public: double AttemptMeasure(RadioState &_txState,
                                 RadioState &_rxState);
 
-  public: std::tuple<bool, double> AttemptSend2(std::vector<double> &_SINR, const uint64_t &_numBytes);
+  public: std::tuple<bool, double> SINRToBER(std::vector<double> &_SINR, const uint64_t &_numBytes);
 
   /// \brief Convert from e_plane.csv and h_plane.csv to two dimensional array.
   public: std::vector<std::vector<double>> FileToArray(std::string _filePath) const;
@@ -354,9 +356,14 @@ double RFComms_custom::Implementation::RadianToDegree(double _radian) const
 }
 
 /////////////////////////////////////////////
+// double RFComms_custom::Implementation::DbmToPow(double _dBm) const
+// {
+//   return 0.001 * pow(10., _dBm / 10.);
+// }
+
 double RFComms_custom::Implementation::DbmToPow(double _dBm) const
 {
-  return 0.001 * pow(10., _dBm / 10.);
+  return pow(10., _dBm / 10.);
 }
 
 
@@ -412,7 +419,10 @@ double RFComms_custom::Implementation::PoseToGain(
 
   const double antennaGain = this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1]
                              + this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1]
-                             - this->radioConfig.maxAntennaGain; // 半値角から考えるのであれば maxAntennaGain->10log10(M_PI)??
+                             - this->radioConfig.maxAntennaGain;
+  
+  // （アンテナ利得最大 - H-Planeの減衰）+（アンテナ利得最大 - E-Planeの減衰）- アンテナ利得最大 = アンテナ利得最大 - H-Planeの減衰 - E-Planeの減衰
+  // 参考文献あり
 
   // igndbg << "[" << _initialPointState.name << "]" << std::endl;
   // igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
@@ -708,30 +718,30 @@ double RFComms_custom::Implementation::AttemptMeasure(
   return rxPower + rxAnntennaGain;
 }
 
-std::tuple<bool, double> RFComms_custom::Implementation::AttemptSend2(
+std::tuple<bool, double> RFComms_custom::Implementation::SINRToBER(
   std::vector<double> &_SINR, const uint64_t &_numBytes)
 {
   return std::make_tuple(true, 0.1);
 }
 
-double RFComms_custom::Implementation::RssiToSnr(
-  int i, std::vector<double> _eachRssi)
+double RFComms_custom::Implementation::RxPowerToSINR(
+  int i, std::vector<double> _eachRSSI)
 {
   double noiseFloor= this->DbmToPow(this->radioConfig.thermalNoiseDensity)*this->radioConfig.capacity;
 
   double interferencePower = 0.0;
-  for (auto &_otherRssi : _eachRssi)
+  for (auto &_otherRSSI : _eachRSSI)
   {
-    if (_eachRssi[i] != _otherRssi)
-      interferencePower += this->DbmToPow(_otherRssi);
+    if (_eachRSSI[i] != _otherRSSI)
+      interferencePower += this->DbmToPow(_otherRSSI);
   }
 
-  igndbg << "interference_power[mW]: " << interferencePower << std::endl;
-  igndbg << "noiseFloor[mW]: " << noiseFloor << std::endl;
+  // igndbg << "interference_power[mW]: " << interferencePower << std::endl;
+  // igndbg << "noiseFloor[mW]: " << noiseFloor << std::endl;
 
-  double SINR = 10*log10(this->DbmToPow(_eachRssi[i])/(noiseFloor + interferencePower));
+  double SINR = 10*log10(this->DbmToPow(_eachRSSI[i])/(noiseFloor + interferencePower));
 
-  igndbg << "SINR[dB]: " << SINR << std::endl;
+  // igndbg << "SINR[dB]: " << SINR << std::endl;
 
   return SINR;
 }
@@ -818,6 +828,8 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
   
     this->dataPtr->radioConfig.maxAntennaGain = (maxGainHPlane + maxGainEPlane)/2.; // 各面の最大値の平均 
 
+
+
     // this->dataPtr->radioConfig.txAntennaRot =
     //   elem->Get<ignition::math::Quaterniond>("tx_antenna_rot",
     //     this->dataPtr->radioConfig.txAntennaRot).first;
@@ -889,8 +901,7 @@ void RFComms_custom::Step(
     }
   }
 
-  int i = 0, j = 0;
-  std::vector<double> eachRssi;
+  std::vector<double> eachRSSI;
   for (auto & [address, content] : _currentRegistry)
   {
     // Reference to the outbound queue for this address.
@@ -904,54 +915,62 @@ void RFComms_custom::Step(
       {
         // The destination address needs to be attached to a robot.
         auto itDst = this->dataPtr->radioStates.find(msg->dst_address());
-        if (itDst == this->dataPtr->radioStates.end())
-          continue;
-        double rssi = this->dataPtr->AttemptMeasure(itSrc->second, itDst->second);
-        eachRssi.push_back(rssi);
-        ++i;
+        
+        double RSSI = this->dataPtr->AttemptMeasure(itSrc->second, itDst->second);
+        eachRSSI.push_back(RSSI);
+
+        bool isConnecting = std::find(this->dataPtr->radioConfig.srcNodes.begin(), this->dataPtr->radioConfig.srcNodes.end(), address) != this->dataPtr->radioConfig.srcNodes.end();
+        if (!isConnecting)
+        {
+          this->dataPtr->radioConfig.srcNodes.push_back(address);
+        }
       }
     }
   }
 
-  for (auto & [address, content] : _currentRegistry)
+  if (eachRSSI.size() == this->dataPtr->radioConfig.srcNodes.size())
   {
-    auto &outbound = content.outboundMsgs;
-    auto itSrc = this->dataPtr->radioStates.find(address);   
-    if (itSrc != this->dataPtr->radioStates.end())
+    int i = 0;
+    for (auto & [address, content] : _currentRegistry)
     {
-      for (const auto &msg : outbound)
+      auto &outbound = content.outboundMsgs;
+      auto itSrc = this->dataPtr->radioStates.find(address);   
+      if (itSrc != this->dataPtr->radioStates.end())
       {
-        auto itDst = this->dataPtr->radioStates.find(msg->dst_address());
-        
-        if (itDst == this->dataPtr->radioStates.end())
-          continue;
-        
-        double SINR = this->dataPtr->RssiToSnr(j ,eachRssi);
-        
-        auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
-
-        // Add rssi and SINR.
-        auto *commsAnalysisPtr = inboundMsg->mutable_header()->add_data();
-        commsAnalysisPtr->set_key("RSSI/SINR: " + address);
-        commsAnalysisPtr->add_value(std::to_string(eachRssi[j]) + "/" + std::to_string(SINR));
-        
-        _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
-
-        if (eachRssi[j] != -std::numeric_limits<double>::infinity())
+        for (const auto &msg : outbound)
         {
-          ignition::math::Pose3 ugvPose = this->dataPtr->radioStates[msg->dst_address()].pose;
-          this->dataPtr->writing_file << ugvPose.Pos().X() << ","
-                                      << ugvPose.Pos().Y() << ","
-                                      << ugvPose.Pos().Z() << ","
-                                      << address << ","
-                                      << eachRssi[j] << ","
-                                      << SINR << std::endl;
+          auto itDst = this->dataPtr->radioStates.find(msg->dst_address());
+          
+          if (itDst == this->dataPtr->radioStates.end())
+            continue;
+
+          double SINR = this->dataPtr->RxPowerToSINR(i ,eachRSSI);
+          
+          auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
+
+          // Add RSSI and SINR.
+          auto *commsAnalysisPtr = inboundMsg->mutable_header()->add_data();
+          commsAnalysisPtr->set_key("RSSI/SINR: " + address);
+          commsAnalysisPtr->add_value(std::to_string(eachRSSI[i]) + "/" + std::to_string(SINR));
+          
+          _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
+
+          if (eachRSSI[i] != -std::numeric_limits<double>::infinity())
+          {
+            ignition::math::Pose3 ugvPose = this->dataPtr->radioStates[msg->dst_address()].pose;
+            this->dataPtr->writing_file << ugvPose.Pos().X() << ","
+                                        << ugvPose.Pos().Y() << ","
+                                        << ugvPose.Pos().Z() << ","
+                                        << address << ","
+                                        << eachRSSI[i] << ","
+                                        << SINR << std::endl;
+          }
+          ++i;
         }
-        ++j;
       }
+      // Clear the outbound queue.
+      _newRegistry[address].outboundMsgs.clear();
     }
-    // Clear the outbound queue.
-    _newRegistry[address].outboundMsgs.clear();
   }
 }
 

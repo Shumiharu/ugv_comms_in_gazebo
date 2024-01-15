@@ -131,7 +131,7 @@ libRFComms_custom.so: /usr/lib/x86_64-linux-gnu/libuuid.so
 libRFComms_custom.so: /usr/lib/x86_64-linux-gnu/libuuid.so
 libRFComms_custom.so: /usr/lib/x86_64-linux-gnu/libignition-msgs8.so.8.7.0
 libRFComms_custom.so: /usr/lib/x86_64-linux-gnu/libsdformat12.so.12.7.2
-libRFComms_custom.so: /usr/lib/x86_64-linux-gnu/libignition-math6.so.6.15.0
+libRFComms_custom.so: /usr/lib/x86_64-linux-gnu/libignition-math6.so.6.15.1
 libRFComms_custom.so: /usr/lib/x86_64-linux-gnu/libignition-utils1.so.1.5.1
 libRFComms_custom.so: /usr/lib/x86_64-linux-gnu/libprotobuf.so
 libRFComms_custom.so: CMakeFiles/RFComms_custom.dir/link.txt

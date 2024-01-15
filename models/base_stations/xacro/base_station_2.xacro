@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<robot name="base_station_2" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:include filename="/home/haruki/Desktop/ugv_comms_in_gazebo/models/xacro/base_station.xacro" /> 
+  <xacro:base_staion>
+    <origin xyz="20 3 0.5" rpy="0 0 0" />
+    <address>base_station_2</address>
+    <topic>base_station_2/rx</topic>
+  </xacro:base_staion>
+</robot>

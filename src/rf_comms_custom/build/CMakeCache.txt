@@ -539,7 +539,7 @@ pkgcfg_lib_ZeroMQ_zmq:FILEPATH=/usr/lib/x86_64-linux-gnu/libzmq.so
 sdformat12_DIR:PATH=/lib/x86_64-linux-gnu/cmake/sdformat12
 
 //The directory containing a CMake configuration file for yaml.
-yaml_DIR:PATH=yaml_DIR-NOTFOUND
+yaml_DIR:PATH=/opt/ros/humble/cmake
 
 
 ########################

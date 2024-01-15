@@ -1,15 +1,46 @@
-<robot name="base_station" xmlns:xacro="http://ros.org/wiki/xacro">
-  <xacro:property name="side" value="1.0" />
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:macro name="base_staion" params="*origin *address *topic">
+    <material name="red">
+      <color rgba="1.0 0.0 0.0 1"/>
+    </material>
 
-  <link name="base_link">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="${side} ${side} ${side}" />
-      </geometry>
-      <material name="red">
-        <color rgba="1.0 0.0 0.0 2.0"/>
-      </material>
-    </visual>
-  </link>
+    <xacro:insert_block name="origin" />
+    <link name="base_station_link">
+      <inertial>
+        <mass value="1.0" />
+        <inertia 
+          ixx="${1/12*1.0*(1.0*1.0 + 1.0*1.0)}" 
+          ixy="0" 
+          ixz="0" 
+          iyy="${1/12*1.0*(1.0*1.0 + 1.0*1.0)}" 
+          iyz="0" 
+          izz="${1/12*1.0*(1.0*1.0 + 1.0*1.0)}"
+        />
+      </inertial>
+      
+      <visual name="base_station_visual">
+        <geometry>
+          <cylinder radius="0.5" length="1.0"/>
+        </geometry>
+        <material name="red"/>
+      </visual>
+
+      <collision name="base_station_collision">
+        <geometry>
+          <cylinder radius="0.5" length="1.0"/>
+        </geometry>
+      </collision>
+    </link>
+    
+    <gazebo>
+      <static>true</static>
+      <plugin
+        filename="ignition-gazebo-comms-endpoint-system"
+        name="ignition::gazebo::systems::CommsEndpoint">
+        <xacro:insert_block name="address" />
+        <xacro:insert_block name="topic" />
+      </plugin>
+    </gazebo>
+  </xacro:macro>
 </robot>

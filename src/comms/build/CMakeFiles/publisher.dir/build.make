@@ -95,7 +95,7 @@ publisher: CMakeFiles/publisher.dir/build.make
 publisher: /usr/lib/x86_64-linux-gnu/libignition-transport11.so.11.4.1
 publisher: /usr/lib/x86_64-linux-gnu/libignition-msgs8.so.8.7.0
 publisher: /usr/lib/x86_64-linux-gnu/libprotobuf.so
-publisher: /usr/lib/x86_64-linux-gnu/libignition-math6.so.6.15.0
+publisher: /usr/lib/x86_64-linux-gnu/libignition-math6.so.6.15.1
 publisher: /usr/lib/x86_64-linux-gnu/libuuid.so
 publisher: /usr/lib/x86_64-linux-gnu/libuuid.so
 publisher: CMakeFiles/publisher.dir/link.txt

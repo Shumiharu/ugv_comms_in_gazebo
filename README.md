@@ -27,7 +27,7 @@ IGNITION_ADD_PLUGIN_ALIAS(RFComms_custom,
 
 カスタマイズしたrf_comms_custom.ccをGazeboが読み込めるようにするには
 ```
-cd ugv_comms_in_gazebo/model/rf_comms_custom
+cd ugv_comms_in_gazebo/src/rf_comms_custom
 mkdir build 
 cd build 
 cmake ..
@@ -116,4 +116,29 @@ ign topic -e -t ugv/rx
 ## 上記のプログラムを一斉に立ち上げる
 ```
 ign launch comms.ign worldName:=rf_comms_custom
+```
+
+
+## xacroをurdfに変換する
+xacroコマンドを実行するにはROS2 Humbleをインストールしてください。
+参考: https://qiita.com/porizou1/items/5dd915402e2990e4d95f
+```
+xacro ./models/base_stations/xacro/<$ENTITY NAME>.xacro  > ./models/base_stations/urdf/${ENTITY NAME}.urdf
+```
+## urdfで記載されたbase_staionをworldに出現させる
+rf_comms_custom.sdfが実行中に以下のコマンドを入力します。
+```
+ign service -s /world/rf_comms/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 5000 --req 'sdf_filename: "./models/base_stations/urdf/${BASE_STATION}.urdf", name: "${BASE_STATION}"'
+```
+
+## urdfが正しく記述されているか確認する
+check_urdfを実行するにはiburdfdom-toolsをインストールしてください。
+```
+sudo apt install -y liburdfdom-tools
+check_urdf ./models/base_stations/urdf/base_station_1.urdf
+```
+
+## SDFormatに変換したurdfの確認
+```
+ign sdf -p ${URDF_FILE} 
 ```
