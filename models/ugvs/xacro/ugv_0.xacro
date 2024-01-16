@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<robot name="uvg_0" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:include filename="/home/haruki/Desktop/ugv_comms_in_gazebo/models/xacro_base/ugv.xacro" /> 
+  
+  <!-- pose -->
+  <origin xyz="-2.0 0.0 0.5" rpy="0 0 0" />
+  
+  <!-- chassis -->
+  <xacro:chassis mass="10.0" width="2.0" height="1.0" dimension="0.5" material="blue"/>
+  
+  <!-- left rear wheel -->
+  <xacro:rear_wheel prefix="left" mass="2.0" radius="0.4" length="0.2" rel_pos="-0.5 0.6 0" rel_rot="${- pi/2} 0 0" material="red"/>
+  
+  <!-- right rear wheel -->
+  <xacro:rear_wheel prefix="right" mass="2.0" radius="0.4" length="0.2" rel_pos="-0.5 -0.6 0" rel_rot="${- pi/2} 0 0" material="red"/>
+  
+  <!-- caster -->
+  <xacro:caster mass="1.0" radius="0.2" rel_pos="0.8 0 -0.2" rel_rot="0 0 0" material="green"/>
+  
+  <!-- gazebo  -->
+  <xacro:gazebo address="ugv_0" topic="ugv_0/rx"/>
+</robot>

@@ -890,7 +890,7 @@ void RFComms_custom::Step(
         std::chrono::duration<double>(_info.simTime).count();
       this->dataPtr->radioStates[address].name = content.modelName;
 
-      if (this->dataPtr->radioStates[address].name == "ugv")
+      if (this->dataPtr->radioStates[address].name == "ugv_0")
       {
         this->dataPtr->radioStates[address].antennaRot = kPose.Rot() * this->dataPtr->radioConfig.rxAntennaRot;
       }

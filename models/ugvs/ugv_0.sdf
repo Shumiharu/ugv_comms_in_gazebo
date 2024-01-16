@@ -1,0 +1,213 @@
+<sdf version='1.9'>
+  <model name='uvg_0'>
+    <link name='chassis_link'>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>10</mass>
+        <inertia>
+          <ixx>1.041666666666667</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.1666666666666661</iyy>
+          <iyz>0</iyz>
+          <izz>3.541666666666667</izz>
+        </inertia>
+      </inertial>
+      <collision name='chassis_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>2 1 0.5</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name='chassis_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>2 1 0.5</size>
+          </box>
+        </geometry>
+        <material>
+          <diffuse>0 0 1 1</diffuse>
+          <ambient>0 0 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='caster_wheel_joint' type='revolute'>
+      <pose relative_to='chassis_link'>0.8 0 -0.2 0 0 0</pose>
+      <parent>chassis_link</parent>
+      <child>caster_link</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-10000000000000000</lower>
+          <upper>10000000000000000</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='caster_link'>
+      <pose relative_to='caster_wheel_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>1</mass>
+        <inertia>
+          <ixx>0.016</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.016</iyy>
+          <iyz>0</iyz>
+          <izz>0.016</izz>
+        </inertia>
+      </inertial>
+      <collision name='caster_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.20000000000000001</radius>
+          </sphere>
+        </geometry>
+      </collision>
+      <visual name='caster_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.20000000000000001</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <diffuse>0 1 0 1</diffuse>
+          <ambient>0 1 0 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='left_rear_wheel_joint' type='revolute'>
+      <pose relative_to='chassis_link'>-0.5 0.6 0 1.570796326794896 0 0</pose>
+      <parent>chassis_link</parent>
+      <child>left_rear_wheel_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.7976900000000001e+308</lower>
+          <upper>1.7976900000000001e+308</upper>
+          <effort>100</effort>
+          <velocity>100</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='left_rear_wheel_link'>
+      <pose relative_to='left_rear_wheel_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.086666666666666684</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.086666666666666684</iyy>
+          <iyz>0</iyz>
+          <izz>0.16</izz>
+        </inertia>
+      </inertial>
+      <collision name='left_rear_wheel_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.20000000000000001</length>
+            <radius>0.40000000000000002</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='left_rear_wheel_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.20000000000000001</length>
+            <radius>0.40000000000000002</radius>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>1 0 0 1</diffuse>
+          <ambient>1 0 0 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='right_rear_wheel_joint' type='revolute'>
+      <pose relative_to='chassis_link'>-0.5 -0.6 0 1.570796326794896 0 0</pose>
+      <parent>chassis_link</parent>
+      <child>right_rear_wheel_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.7976900000000001e+308</lower>
+          <upper>1.7976900000000001e+308</upper>
+          <effort>100</effort>
+          <velocity>100</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='right_rear_wheel_link'>
+      <pose relative_to='right_rear_wheel_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.086666666666666684</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.086666666666666684</iyy>
+          <iyz>0</iyz>
+          <izz>0.16</izz>
+        </inertia>
+      </inertial>
+      <collision name='right_rear_wheel_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.20000000000000001</length>
+            <radius>0.40000000000000002</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='right_rear_wheel_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.20000000000000001</length>
+            <radius>0.40000000000000002</radius>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>1 0 0 1</diffuse>
+          <ambient>1 0 0 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <static>false</static>
+    <plugin name='ignition::gazebo::systems::DiffDrive' filename='libignition-gazebo-diff-drive-system.so'>
+      <left_joint>left_rear_wheel_joint</left_joint>
+      <right_joint>right_rear_wheel_joint</right_joint>
+      <wheel_separation>1.2</wheel_separation>
+      <wheel_radius>0.4</wheel_radius>
+      <odom_publish_frequency>1</odom_publish_frequency>
+      <topic>cmd_vel</topic>
+    </plugin>
+    <plugin name='ignition::gazebo::systems::CommsEndpoint' filename='ignition-gazebo-comms-endpoint-system'>
+      <address>ugv_0</address>
+      <topic>ugv_0/rx</topic>
+    </plugin>
+    <pose>-2 0 0.5 0 0 0</pose>
+  </model>
+</sdf>

@@ -6,7 +6,7 @@
     </material>
 
     <xacro:insert_block name="origin" />
-    <link name="base_station_link">
+    <link name="ground_station_link">
       <inertial>
         <mass value="1.0" />
         <inertia 
@@ -19,14 +19,14 @@
         />
       </inertial>
       
-      <visual name="base_station_visual">
+      <visual name="ground_station_visual">
         <geometry>
           <cylinder radius="0.5" length="1.0"/>
         </geometry>
         <material name="red"/>
       </visual>
 
-      <collision name="base_station_collision">
+      <collision name="ground_station_collision">
         <geometry>
           <cylinder radius="0.5" length="1.0"/>
         </geometry>

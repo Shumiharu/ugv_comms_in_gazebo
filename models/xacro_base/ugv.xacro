@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <material name="red">
+    <color rgba="1.0 0.0 0.0 1"/>
+  </material>
+
+  <material name="green">
+    <color rgba="0.0 1.0 0.0 1"/>
+  </material>
+
+  <material name="blue">
+    <color rgba="0.0 0.0 1.0 1"/>
+  </material>
+
+  <xacro:macro name="chassis" params="mass width height dimension material">
+    <link name="chassis_link">
+      <inertial>
+        <mass value="${mass}" />
+        <inertia 
+          ixx="${1/12*mass*(height*height + dimension*dimension)}" 
+          ixy="0" 
+          ixz="0" 
+          iyy="${1/12*mass*(width*width + height*height)}" 
+          iyz="0" 
+          izz="${1/12*mass*(width*width + dimension*dimension)}"
+        />
+      </inertial>
+      
+      <visual>
+        <geometry>
+          <box size="${width} ${height} ${dimension}"/>
+        </geometry>
+        <material name="${material}" />
+      </visual>
+
+      <collision>
+        <geometry>
+          <box size="${width} ${height} ${dimension}"/>
+        </geometry>
+      </collision>
+    </link>
+  </xacro:macro>
+
+  <xacro:macro name="rear_wheel" params="prefix mass radius length rel_pos rel_rot material">
+    <link name="${prefix}_rear_wheel_link">
+      <inertial>
+        <mass value="${mass}"/>
+        <inertia 
+          ixx="${1/12*mass*(3*radius*radius + length*length)}" 
+          ixy="0" 
+          ixz="0" 
+          iyy="${1/12*mass*(3*radius*radius + length*length)}" 
+          iyz="0" 
+          izz="${1/2*mass*radius*radius}"
+        />
+      </inertial>
+      <visual>
+        <geometry>
+          <cylinder radius="${radius}" length="${length}"/>
+        </geometry>
+        <material name="${material}" />
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder radius="${radius}" length="${length}"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="${prefix}_rear_wheel_joint" type='revolute'>
+      <origin xyz="${rel_pos}" rpy="${rel_rot}"/>
+      <parent link="chassis_link"/>
+      <child link="${prefix}_rear_wheel_link"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-1.79769e+308" upper="1.79769e+308" effort="1.79769e+308" velocity="1.79769e+308"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="caster" params="mass radius rel_pos rel_rot material">
+    <link name="caster_link">
+      <inertial>
+        <mass value="${mass}"/>
+        <inertia 
+          ixx="${2/5*mass*radius*radius}" 
+          ixy="0" 
+          ixz="0" 
+          iyy="${2/5*mass*radius*radius}" 
+          iyz="0" 
+          izz="${2/5*mass*radius*radius}"
+        />
+      </inertial>
+      <visual>
+        <geometry>
+          <sphere radius="${radius}"/>
+        </geometry>
+        <material name="${material}" />
+      </visual>
+      <collision>
+        <geometry>
+          <sphere radius="${radius}"/>
+        </geometry>
+      </collision>
+    </link>
+    <joint name="caster_wheel_joint" type="continuous">
+      <origin xyz="${rel_pos}" rpy="${rel_rot}"/>
+      <parent link="chassis_link"/>
+      <child link="caster_link"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="gazebo" params="address topic">
+    <gazebo>
+      <static>false</static>
+      <plugin
+          filename="libignition-gazebo-diff-drive-system.so"
+          name="ignition::gazebo::systems::DiffDrive">
+          <left_joint>left_rear_wheel_joint</left_joint>
+          <right_joint>right_rear_wheel_joint</right_joint>
+          <wheel_separation>1.2</wheel_separation>
+          <wheel_radius>0.4</wheel_radius>
+          <odom_publish_frequency>1</odom_publish_frequency>
+          <topic>cmd_vel</topic>
+      </plugin>
+      <plugin
+        filename="ignition-gazebo-comms-endpoint-system"
+        name="ignition::gazebo::systems::CommsEndpoint">
+        <address>${address}</address>
+        <topic>${topic}</topic>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+</robot>

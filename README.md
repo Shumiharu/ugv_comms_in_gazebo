@@ -123,22 +123,29 @@ ign launch comms.ign worldName:=rf_comms_custom
 xacroコマンドを実行するにはROS2 Humbleをインストールしてください。
 参考: https://qiita.com/porizou1/items/5dd915402e2990e4d95f
 ```
-xacro ./models/base_stations/xacro/<$ENTITY NAME>.xacro  > ./models/base_stations/urdf/${ENTITY NAME}.urdf
+xacro ./models/ground_stations/xacro/<$ENTITY NAME>.xacro  > ./models/ground_stations/urdf/${ENTITY NAME}.urdf
 ```
-## urdfで記載されたbase_staionをworldに出現させる
+## urdfで記載されたground_stationをworldに出現させる
 rf_comms_custom.sdfが実行中に以下のコマンドを入力します。
 ```
-ign service -s /world/rf_comms/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 5000 --req 'sdf_filename: "./models/base_stations/urdf/${BASE_STATION}.urdf", name: "${BASE_STATION}"'
+ign service -s /world/rf_comms/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 5000 --req 'sdf_filename: "./models/ground_stations/urdf/${ground_station}.urdf", name: "${ground_station}"'
+```
+
+## urdfで記載されたugvをworldに出現させる
+```
+ign service -s /world/rf_comms/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 5000 --req 'sdf_filename: "./models/ugvs/urdf/${ugv}.urdf", name: "${ugv}"'
 ```
 
 ## urdfが正しく記述されているか確認する
 check_urdfを実行するにはiburdfdom-toolsをインストールしてください。
 ```
 sudo apt install -y liburdfdom-tools
-check_urdf ./models/base_stations/urdf/base_station_1.urdf
+check_urdf ./models/ground_stations/urdf/ground_station_1.urdf
 ```
 
 ## SDFormatに変換したurdfの確認
 ```
 ign sdf -p ${URDF_FILE} 
 ```
+
+xacro ./models/xacro_base/ugv.xacro  > ./models/ugvs/urdf/ugv.urdf

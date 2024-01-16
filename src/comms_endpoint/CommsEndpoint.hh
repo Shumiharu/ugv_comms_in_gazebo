@@ -55,8 +55,8 @@ namespace systems
   /// <plugin
   ///   filename="ignition-gazebo-comms-endpoint-system"
   ///   name="ignition::gazebo::systems::CommsEndpoint">
-  ///   <address>base_station_1</address>
-  ///   <topic>base_station_1/rx</topic>
+  ///   <address>ground_station_1</address>
+  ///   <topic>ground_station_1/rx</topic>
   ///   <broker>
   ///     <bind_service>/broker/bind</bind_service>
   ///     <unbind_service>/broker/unbind</unbind_service>

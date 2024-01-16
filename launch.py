@@ -31,24 +31,30 @@ if __name__ == '__main__':
   
   print('publisher is compiled.')
 
-  base_station_dir = './models/base_stations/xacro'
-  base_station_num = sum(os.path.isfile(os.path.join(base_station_dir, name)) for name in os.listdir(base_station_dir))
-  # base_station_num = 1
+  ground_station_dir = './models/ground_stations/xacro'
+  ground_station_num = sum(os.path.isfile(os.path.join(ground_station_dir, name)) for name in os.listdir(ground_station_dir))
+  # ground_station_num = 1
   
   # convert xacro to urdf
-  for i in range(base_station_num):
-    base_station = 'base_station_' + str(i)
+  try:
+    proc_cvt_ugv = subprocess.run(f'xacro ./models/ugvs/xacro/ugv_0.xacro  > ./models/ugvs/urdf/ugv_0.urdf', shell=True)
+  except subprocess.CalledProcessError as e:
+    print(e)
+    exit()
+  
+  for i in range(ground_station_num):
+    ground_station = 'ground_station_' + str(i)
 
     try:
-      proc_cvt = subprocess.run(f'xacro ./models/base_stations/xacro/{base_station}.xacro  > ./models/base_stations/urdf/{base_station}.urdf', shell=True)
+      proc_cvt_gs = subprocess.run(f'xacro ./models/ground_stations/xacro/{ground_station}.xacro  > ./models/ground_stations/urdf/{ground_station}.urdf', shell=True)
     except subprocess.CalledProcessError as e:
       print(e)
       exit()
 
-    print(base_station + '.xacro was converted to urdf')
+    print(ground_station + '.xacro was converted to urdf')
   
   # start world
-  debugging_level = 0
+  debugging_level = 5
   proc_gz = subprocess.Popen('exec ign gazebo -v' + str(debugging_level) + ' ./worlds/rf_comms_custom.sdf', shell=True)
 
   # wait for running gazebo
@@ -56,27 +62,40 @@ if __name__ == '__main__':
     time.sleep(1)  
   print('Gazebo GUI is ready')
 
-  # try launching a comms subscriber
-  proc_tpc = subprocess.Popen('exec ign topic -e -t ugv/rx', shell=True)
+  # try setting ugv and launching a comms subscriber
+  try:
+    proc_set_ugv = subprocess.run(f'ign service -s /world/rf_comms/create \
+                  --reqtype ignition.msgs.EntityFactory \
+                  --reptype ignition.msgs.Boolean \
+                  --timeout 5000 \
+                  --req "sdf_filename: \'./models/ugvs/urdf/ugv_0.urdf\', name: \'ugv_0\'"',
+                  shell=True, check=True
+                  )
+  except subprocess.CalledProcessError as e:
+    print(e)
+  
+  print('ugv_0 is successed to set up')
 
-  # try setting base_stations and launching a comms publisher
+  proc_tpc = subprocess.Popen('exec ign topic -e -t ugv_0/rx', shell=True)
+  
+  # try setting ground_stations and launching a comms publisher
   proc_pubs = []
-  for i in range(base_station_num):
-    base_station = 'base_station_' + str(i)
+  for i in range(ground_station_num):
+    ground_station = 'ground_station_' + str(i)
     try:
-      proc_set = subprocess.run(f'ign service -s /world/rf_comms/create \
+      proc_set_gb = subprocess.run(f'ign service -s /world/rf_comms/create \
                     --reqtype ignition.msgs.EntityFactory \
                     --reptype ignition.msgs.Boolean \
                     --timeout 5000 \
-                    --req "sdf_filename: \'./models/base_stations/urdf/{base_station}.urdf\', name: \'{base_station}\'"',
+                    --req "sdf_filename: \'./models/ground_stations/urdf/{ground_station}.urdf\', name: \'{ground_station}\'"',
                     shell=True, check=True
                     )
     except subprocess.CalledProcessError as e:
       print(e)
 
-    print(base_station + ' is successed to set up')
+    print(ground_station + ' is successed to set up')
 
-    proc_pub = subprocess.Popen(f'exec ./src/comms/build/publisher {base_station}', shell=True)
+    proc_pub = subprocess.Popen(f'exec ./src/comms/build/publisher {ground_station}', shell=True)
     proc_pubs.append(proc_pub)
   
   # If Gazebo is killed (ex: Ctrl + c), child processes are killed
@@ -84,8 +103,4 @@ if __name__ == '__main__':
     proc_tpc.kill()
     for proc_pub in proc_pubs:
       proc_pub.kill()
-
-
-
-
 
