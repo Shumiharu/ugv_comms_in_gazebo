@@ -115,7 +115,8 @@ ign topic -e -t ugv/rx
 
 ## 上記のプログラムを一斉に立ち上げる
 ```
-ign launch comms.ign worldName:=rf_comms_custom
+ign launch comms.ign worldName:=rf_comms_custom -> こちらは使わないよう変更しました下記コマンドを利用してください
+python3 launch.py
 ```
 
 
@@ -147,5 +148,3 @@ check_urdf ./models/ground_stations/urdf/ground_station_1.urdf
 ```
 ign sdf -p ${URDF_FILE} 
 ```
-
-xacro ./models/xacro_base/ugv.xacro  > ./models/ugvs/urdf/ugv.urdf
