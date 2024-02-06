@@ -2,7 +2,7 @@
 <robot name="ground_station_0" xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:include filename="/home/haruki/Desktop/ugv_comms_in_gazebo/models/xacro_base/ground_station.xacro" /> 
   <xacro:base_staion>
-    <origin xyz="10 3 0.5" rpy="0 0 0" />
+    <origin xyz="5 3 0.5" rpy="0 0 0" />
     <address>ground_station_0</address>
     <topic>ground_station_0/rx</topic>
   </xacro:base_staion>

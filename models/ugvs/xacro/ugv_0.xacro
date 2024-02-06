@@ -3,7 +3,7 @@
   <xacro:include filename="/home/haruki/Desktop/ugv_comms_in_gazebo/models/xacro_base/ugv.xacro" /> 
   
   <!-- pose -->
-  <origin xyz="-2.0 0.0 0.5" rpy="0 0 0" />
+  <origin xyz="2.0 0.0 0.5" rpy="0 0 0" />
   
   <!-- chassis -->
   <xacro:chassis mass="10.0" width="2.0" height="1.0" dimension="0.5" material="blue"/>

@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
   ground_station_dir = './models/ground_station_antennas/xacro'
   ground_station_antenna_num = sum(os.path.isfile(os.path.join(ground_station_dir, name)) for name in os.listdir(ground_station_dir))
-  # ground_station_antenna_num = 1
+  ground_station_antenna_num = 1
   
   # convert xacro to urdf
   try:

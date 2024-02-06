@@ -23,6 +23,7 @@
           <mesh filename="https://fuel.gazebosim.org/1.0/OpenRobotics/models/antenna%20/5/files/meshes/antenna.dae"/>
         </geometry>
         <origin xyz="0 0 -${antenna_height}" rpy="0 0 ${3*pi/4}"/>
+
       </visual>
       <collision>
         <geometry>

@@ -14,7 +14,7 @@
     <color rgba="0.0 0.0 1.0 1"/>
   </material>
   <!-- pose -->
-  <origin rpy="0 0 0" xyz="-2.0 0.0 0.5"/>
+  <origin rpy="0 0 0" xyz="2.0 0.0 0.5"/>
   <link name="chassis_link">
     <inertial>
       <mass value="10.0"/>

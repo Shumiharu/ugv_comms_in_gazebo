@@ -7,7 +7,7 @@
   <material name="red">
     <color rgba="1.0 0.0 0.0 1"/>
   </material>
-  <origin rpy="0 0 0" xyz="10 3 0.5"/>
+  <origin rpy="0 0 0" xyz="5 3 0.5"/>
   <link name="ground_station_link">
     <inertial>
       <mass value="1.0"/>
