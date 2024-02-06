@@ -424,11 +424,11 @@ double RFComms_custom::Implementation::PoseToGain(
   // （アンテナ利得最大 - H-Planeの減衰）+（アンテナ利得最大 - E-Planeの減衰）- アンテナ利得最大 = アンテナ利得最大 - H-Planeの減衰 - E-Planeの減衰
   // 参考文献あり
 
-  // igndbg << "[" << _initialPointState.name << "]" << std::endl;
-  // igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
-  // igndbg << "AntennaGain(E-Plane): " << this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1] << std::endl;
-  // igndbg << "AntennaGain(H-Plane): " << this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1] << std::endl;
-  // igndbg << "AntennaGain3d: " << antennaGain << std::endl;
+  igndbg << "[" << _initialPointState.name << "]" << std::endl;
+  igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
+  igndbg << "AntennaGain(E-Plane): " << this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1] << std::endl;
+  igndbg << "AntennaGain(H-Plane): " << this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1] << std::endl;
+  igndbg << "AntennaGain3d: " << antennaGain << std::endl;
                             
   return antennaGain;
 }

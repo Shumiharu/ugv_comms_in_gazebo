@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<robot name="multicopter_0" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:property name="entity_name" value="multicopter_0"/>
+  <xacro:include filename="/home/haruki/Desktop/ugv_comms_in_gazebo/models/xacro_base/multicopter.xacro" /> 
+
+  <!-- <origin xyz="0.0 0.0 0.053302" rpy="0 0 0" /> -->
+  <origin xyz="0.0 0.0 1.0" rpy="0 0 0" />
+  
+  <!-- frame -->
+  <xacro:base name="${entity_name}"/>
+
+  <!-- rotor -->
+  <xacro:rotor name="${entity_name}" num="0" rel_pos="0.13 -0.22 0.023" rel_rot="0 -0 0"/>
+  <xacro:rotor name="${entity_name}" num="1" rel_pos="-0.13 0.2 0.023" rel_rot="0 -0 0"/>
+  <xacro:rotor name="${entity_name}" num="2" rel_pos="0.13 0.22 0.023" rel_rot="0 -0 0"/>
+  <xacro:rotor name="${entity_name}" num="3" rel_pos="-0.13 -0.2 0.023" rel_rot="0 -0 0"/>
+  
+  <!-- gazebo  -->
+  <xacro:gazebo name="${entity_name}"/>
+  
+</robot>
