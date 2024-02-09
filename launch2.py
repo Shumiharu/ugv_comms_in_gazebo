@@ -13,16 +13,16 @@ def is_gazebo_ready():
   
 if __name__ == '__main__':
 
-  # compile rf_comms_custom
+  # built rf_comms_custom
   try:
     subprocess.run('cd ./src/rf_comms_custom/build && make && sudo cp ./libRFComms_custom.so /usr/lib/x86_64-linux-gnu/ign-gazebo-6/plugins/.', shell=True, check=True)
   except subprocess.CalledProcessError as e:
     print(e)
     exit()
   
-  print('rf_comms_custom is compiled.')
+  print('rf_comms_custom was built.')
   
-  # compile publisher
+  # build publisher
   current_dirpath = os.getcwd()
   try:
     subprocess.run('cd ./src/comms/build && make', shell=True, check=True)
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     print(e)
     exit()
   
-  print('publisher is compiled.')
+  print('publisher was built.')
 
   ground_station_dir = './models/ground_station_antennas/xacro'
   ground_station_antenna_num = sum(os.path.isfile(os.path.join(ground_station_dir, name)) for name in os.listdir(ground_station_dir))

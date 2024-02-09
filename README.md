@@ -1,141 +1,133 @@
 # ugv_comms_in_gazebo
 
-## rf_comms.cc -> rf_comms_custom.cc にカスタマイズする
-gz-sim/src/systems/rf_commsのフォルダをmodel/にコピーし、rf_commsからrf_comms_customとしてカスタマイズしています（おおよそRFComms->RFComms_customに名称変更すれば使えるはずです）。例えば、
+## カスタムプラグインの作成方法
 
-変更前 rf_comms.cc line 475
-```
-IGNITION_ADD_PLUGIN(RFComms,
-                    ignition::gazebo::System,
-                    comms::ICommsModel::ISystemConfigure,
-                    comms::ICommsModel::ISystemPreUpdate)
+## requirement
+Ubuntu: 22.04
+ROS2: Humble
+Ignition Gazebo: Fortress
 
-IGNITION_ADD_PLUGIN_ALIAS(RFComms,
-                          "ignition::gazebo::systems::RFComms")
-```
+参考: https://qiita.com/porizou1/items/5dd915402e2990e4d95f
 
-変更後 rf_comms_custom.cc
+## Usage 
 ```
-IGNITION_ADD_PLUGIN(RFComms_custom,
-                    ignition::gazebo::System,
-                    comms::ICommsModel::ISystemConfigure,
-                    comms::ICommsModel::ISystemPreUpdate)
+python ./launch.py # UGV
+python3 ./launch2.py # multicopter
+```
+launch.py及びlaunch2.pyは以下を同時に処理します。各処理の詳細については後述します。
+1. ./src/comms/publisher.cc のビルド
+2. ./src/rf_comms_custom/rf_comms_custom.cc のビルド & ビルドされた実行ファイル libRFComms_custom.so を該当ディレクトリにコピー
+3. ./modelsにある地上局とモビリティのモデルをXML macro（xacro）からunified robot description format（urdf）に変換
+4. Gazebo GUIの起動
+5. Gazebo GUIに3.のモデルを生成
+6. publish（送信）の開始
+7. subscribe（受信）の開始
+8. launch.pyのプログラムの強制終了（ctrl + c）待機 & 終了後に子プロセスを強制終了
 
-IGNITION_ADD_PLUGIN_ALIAS(RFComms_custom,
-                          "ignition::gazebo::systems::RFComms_custom")
-```
+Gazebo GUI起動後、以下の操作を行うと、モビリティを操作できます。
+1. ウィンドウ右上部の「︙」をクリック
+2. その中から「Key Publisher」をクリック
+3. ウィンドウ左下部の「再生（▶）」をクリック
+4. キーボードの「↑」などを押下するとモビリティが動きます。詳しくはシミュレーション実行ファイル（.sdf）を参照してください。
 
-カスタマイズしたrf_comms_custom.ccをGazeboが読み込めるようにするには
+## 1. ./src/comms/publisher.cc のビルド
 ```
-cd ugv_comms_in_gazebo/src/rf_comms_custom
-mkdir build 
-cd build 
-cmake ..
-make
-sudo cp ./libRFComms_custom.so /usr/lib/x86_64-linux-gnu/ign-gazebo-6/plugins/.
-```
-のようにビルドして生成されたlibRFComms_custom.soをGazeboがプラグインを参照するパス/usr/lib/x86_64-linux-gnu/ign-gazebo-6/plugins/にコピーする必要があります。
-
-さらにプラグイン参照先も変更してください
-
-変更前 rf_comms.sdf
-```
-<plugin
-  filename="ignition-gazebo-rf-comms-system"
-  name="ignition::gazebo::systems::RFComms">
-  <range_config>
-    <max_range>500000.0</max_range>
-    <fading_exponent>2.6</fading_exponent>
-    <l0>40</l0>
-    <sigma>10.0</sigma>
-  </range_config>
-  <radio_config>
-    <capacity>1000000</capacity>
-    <tx_power>20</tx_power>
-    <noise_floor>-90</noise_floor>
-    <modulation>QPSK</modulation>
-  </radio_config>
-</plugin>
-```
-
-変更後 rf_comms_custom.sdf
-```
-<plugin
-  filename="RFComms_custom"
-  name="ignition::gazebo::systems::RFComms_custom">
-  <range_config>
-    <max_range>500.0</max_range>
-    <fading_exponent>2.0</fading_exponent>
-    <l0>68</l0>
-    <sigma>3.0</sigma>
-  </range_config>
-  <radio_config>
-    <center_frequency>600000000</center_frequency>
-    <capacity>600000000</capacity>
-    <tx_power>22.5</tx_power>
-    <noise_floor>-90</noise_floor>
-    <modulation>QPSK</modulation>
-  </radio_config>
-</plugin>
-```
-
-## Gazebo Fortressを起動する
-
-rf_comms pluginのパラメータの読み込み先ファイルパス（絶対パス）をそれぞれ変更してください。相対パスで読み込める方法あれば連絡ください
-
-comms_analysisタグ
-/home/haruki/Desktop/ugv_comms_in_gazebo/comms_analysis/ -> （任意のフォルダ）/ugv_comms_in_gazebo/comms_analysis/
-
-antenna_gains_dir_pathタグ
-/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains/　-> （任意のフォルダ）/ugv_comms_in_gazebo/antenna_gains/
-
-```
-ign gazebo rf_comms_custom.sdf
-```
-
-rf_comms_custom.cc のignwrn/igndbgなど表示させたい場合は
-```
-ign gazebo -v<$NUMBER> rf_comms_custom.sdf
-```
-
-## 送信
-gz-sim/examples/standalone/commsをフォルダごとコピーしてmodelフォルダにコピーしています
-```
-cd ugv_comms_in_gazebo/model/comms
+cd ./src/comms/build
 mkdir build
 cd build
 cmake ..
 make
-./publisher ugv
 ```
-## 受信
+なお、launch.py/launch2.pyではbuild出力ディレクトリ（./src/comms/build）は作成されている前提で実行している点に注意してください。
+オリジナルはgz-sim/examples/standalone/commsにあります。
+
+## 2. ./src/rf_comms_custom/rf_comms_custom.cc のビルド & ビルドされた実行ファイル libRFComms_custom.so を該当ディレクトリにコピー
+rf_comms_customはGazeboのシステムプラグインとなるので、Gazeboが起動時にReadするために該当のディレクトリにコピーする必要があります。
 ```
-ign topic -e -t ugv/rx
+cd ./src/rf_comms_custom/build
+mkdir build
+cd build
+cmake ..
+make
+sudo cp ./libRFComms_custom.so /usr/lib/x86_64-linux-gnu/ign-gazebo-6/plugins/.
+```
+なお、launch.py/launch2.pyではbuild出力ディレクトリ（./src/rf_comms_custom/build）は作成されている前提で実行している点に注意してください。
+また、sudoのため、管理者のパスワードを求められます。
+
+## 3. ./modelsにある地上局とモビリティのモデルをXML macro（xacro）からunified robot description format（urdf）に変換
+Gazeboで用いられるSDFormat（SDF）でも地上局やモビリティなどのモデルを記述できますが、冗長になってしまうためxacroで記述し、urdfに変換することでこれを解決しました。
+```
+xacro ./models/${MODEL_DIR}/xacro/${MODEL_NAME}.xacro  > ./models/${MODEL_DIR}/urdf/${MODEL_NAME}.urdf
+```
+なお、./modelsの構成は
+```
+models
+¦-${MODEL_NAME}s
+¦ ¦-xacro
+¦ ¦ ¦-${MODEL_NAME}_0.xacro
+¦ ¦ ¦-         .
+¦ ¦ ¦-         .
+¦ ¦ ¦-         .
+¦ ¦-urdf
+¦ ¦ ¦-${MODEL_NAME}_0.urdf <- 生成ファイル
+¦ ¦ ¦-         .
+¦ ¦ ¦-         .
+¦ ¦ ¦-         .
+¦-xacro_base
+  ¦-${MODEL_NAME}.xacro
+```
+のようになっており、モデルのベースは./models/xacro_base/${MODEL_NAME}.xacroに記述されており、各モデルの座標といった固有のパラメータは./models/${MODEL_NAME}s/xacro/${MODEL_NAME}_0.xacroに記載されています。上記コマンドにより、./models/${MODEL_NAME}s/xacro/${MODEL_NAME}_0.urdfが生成されます。
+
+## 4. Gazebo GUIの起動
+RF_comms_custom.ccなどのシステムプラグインのプログラムにあるigndbgやignwrnなどは、オプション -v でデバッグレベルを設定することで表示/非表示にできます。
+```
+ign gazebo -v${DEBUGGING_LEVEL} ./worlds/${WORLD_NAME}.sdf
+```
+なお、${WORLD_NAME}は${WORLD_NAME}.sdfのworldタグのnameと同一になるようにしてください。
+また、./world/rf_comms_custom.sdfについて、プラグインのタグの引数にファイルパスを入れるところがありますが、必要に応じて変更してください。（相対パスも設定可能です）
+
+```
+<plugin
+  filename="RFComms_custom"
+  name="ignition::gazebo::systems::RFComms_custom">
+  <file_config>
+    <comms_analysis>./comms_analysis/</comms_analysis> <!-- ここ -->
+  </file_config>
+  <range_config>
+    <!-- 中略 -->
+  </range_config>
+  <radio_config>
+    <!-- 中略 -->
+    <antenna_gains_dir_path>./antenna_gains/</antenna_gains_dir_path>　<!-- ここ -->
+  </radio_config>
+</plugin>
 ```
 
-## 上記のプログラムを一斉に立ち上げる
+## 5. Gazebo GUIに3.のモデルを生成
+SDFに記述したモデルはGazebo起動と同時に生成されますが、urdfの場合はGazebo起動後に別途生成する必要があります。
 ```
-ign launch comms.ign worldName:=rf_comms_custom -> こちらは使わないよう変更しました下記コマンドを利用してください
-python3 launch.py
+ign service -s ./world/${WORLD_NAME}/create \
+                  --reqtype ignition.msgs.EntityFactory \
+                  --reptype ignition.msgs.Boolean \
+                  --timeout 5000 \
+                  --req 'sdf_filename: "./models/${MODEL_NAME}s/urdf/${MODEL_NAME}_0.urdf", name: "${MODEL_NAME}_0"'
+```
+参考: https://gazebosim.org/docs/fortress/spawn_urdf
+
+## 6. publish（送信）の開始
+```
+./publisher ${GROUND_STATION_ANTENNA_MODEL_NAME} # ex: ./publisher ground_station_antenna_0
+```
+## 7. subscribe（受信）の開始
+```
+ign topic -e -t ${MOBILITY_MODEL_NAME}/rx # ex: ign topic -e -t multicopter_0/rx
 ```
 
+## 8. launch.pyのプログラムの強制終了（ctrl + c）待機 & 終了後に子プロセスを強制終了
+Pythonのサブプロセスは親プロセス（launch.py/launch2.py）を強制終了させても子プロセス（6.や7.のコマンド）は強制終了せず、PCの処理能力が低下するので注意。
 
-## xacroをurdfに変換する
-xacroコマンドを実行するにはROS2 Humbleをインストールしてください。
-参考: https://qiita.com/porizou1/items/5dd915402e2990e4d95f
-```
-xacro ./models/ground_stations/xacro/<$ENTITY NAME>.xacro  > ./models/ground_stations/urdf/${ENTITY NAME}.urdf
-```
-## urdfで記載されたground_stationをworldに出現させる
-rf_comms_custom.sdfが実行中に以下のコマンドを入力します。
-```
-ign service -s /world/rf_comms/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 5000 --req 'sdf_filename: "./models/ground_stations/urdf/${ground_station}.urdf", name: "${ground_station}"'
-```
 
-## urdfで記載されたugvをworldに出現させる
-```
-ign service -s /world/rf_comms/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 5000 --req 'sdf_filename: "./models/ugvs/urdf/${ugv}.urdf", name: "${ugv}"'
-```
+
 
 ## urdfが正しく記述されているか確認する
 check_urdfを実行するにはiburdfdom-toolsをインストールしてください。
@@ -148,3 +140,51 @@ check_urdf ./models/ground_stations/urdf/ground_station_1.urdf
 ```
 ign sdf -p ${URDF_FILE} 
 ```
+
+## システムプラグインのカスタマイズ方法
+デフォルトのシステムプラグインをカスタマイズする方法を以下に示しています。
+rf_comms.cc -> rf_comms_custom.cc
+```
+// Before
+IGNITION_ADD_PLUGIN(RFComms,
+                    ignition::gazebo::System,
+                    comms::ICommsModel::ISystemConfigure,
+                    comms::ICommsModel::ISystemPreUpdate)
+
+IGNITION_ADD_PLUGIN_ALIAS(RFComms,
+                          "ignition::gazebo::systems::RFComms")
+```
+
+```
+// After
+IGNITION_ADD_PLUGIN(RFComms_custom,
+                    ignition::gazebo::System,
+                    comms::ICommsModel::ISystemConfigure,
+                    comms::ICommsModel::ISystemPreUpdate)
+
+IGNITION_ADD_PLUGIN_ALIAS(RFComms_custom,
+                          "ignition::gazebo::systems::RFComms_custom")
+```
+なお、前述の通り、rf_comms_custom.cc がビルドされた実行ファイル libRFComms_custom.so は /usr/lib/x86_64-linux-gnu/ign-gazebo-6/plugins/. にコピーする必要があります。
+
+rf_comms.sdf -> rf_comms_custom.sdf
+```
+<!-- Before -->
+<plugin
+  filename="ignition-gazebo-rf-comms-system"
+  name="ignition::gazebo::systems::RFComms">
+  <!-- 中略 -->
+</plugin>
+```
+
+```
+<!-- After -->
+<plugin
+  filename="RFComms_custom"
+  name="ignition::gazebo::systems::RFComms_custom">
+  <!-- 中略 -->
+</plugin>
+```
+参考: 
+1. https://gazebosim.org/api/gazebo/4.2/createsystemplugins.html 
+2. https://nullpo24.hatenablog.com/entry/2020/11/14/155631
