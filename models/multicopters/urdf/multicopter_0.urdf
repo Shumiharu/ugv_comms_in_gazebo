@@ -5,7 +5,7 @@
 <!-- =================================================================================== -->
 <robot name="multicopter_0">
   <!-- <origin xyz="0.0 0.0 0.053302" rpy="0 0 0" /> -->
-  <origin rpy="0 0 0" xyz="0.0 0.0 2.0"/>
+  <origin rpy="0 0 0" xyz="0 0.0 3.0"/>
   <link name="multicopter_0/base_link">
     <inertial>
       <mass value="1.5"/>

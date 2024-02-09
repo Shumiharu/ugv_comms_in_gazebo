@@ -1,11 +1,12 @@
 <?xml version="1.0"?>
 <robot name="ground_station_antenna_2" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:arg name="current_dirpath" default=""/>
   <xacro:property name="entity_name" value="ground_station_antenna_2"/>
   
-  <xacro:property name="pos_2d" value="10 3"/>
+  <xacro:property name="pos_2d" value="20 3"/>
   <xacro:property name="antenna_height" value="1.8"/>
 
-  <xacro:include filename="/home/haruki/Desktop/ugv_comms_in_gazebo/models/xacro_base/ground_station_antenna.xacro" /> 
+  <xacro:include filename="$(arg current_dirpath)/models/xacro_base/ground_station_antenna.xacro" /> 
   
   <origin xyz="${pos_2d} ${antenna_height}" rpy="0 0 0"/>
   <xacro:ground_station_antenna name="${entity_name}" antenna_height="${antenna_height}"/>

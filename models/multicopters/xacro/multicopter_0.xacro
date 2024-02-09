@@ -1,10 +1,11 @@
 <?xml version="1.0"?>
 <robot name="multicopter_0" xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:property name="entity_name" value="multicopter_0"/>
-  <xacro:include filename="/home/haruki/Desktop/ugv_comms_in_gazebo/models/xacro_base/multicopter.xacro" /> 
+  <xacro:arg name="current_dirpath" default=""/>
+  <xacro:include filename="$(arg current_dirpath)/models/xacro_base/multicopter.xacro" /> 
 
   <!-- <origin xyz="0.0 0.0 0.053302" rpy="0 0 0" /> -->
-  <origin xyz="0.0 0.0 2.0" rpy="0 0 0" />
+  <origin xyz="0 0.0 3.0" rpy="0 0 0" />
   
   <!-- frame -->
   <xacro:base name="${entity_name}"/>

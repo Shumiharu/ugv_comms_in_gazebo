@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <sdf version="1.6">
-  <world name="multicopter">
-    <physics name="4ms" type="ignored">
-      <max_step_size>0.004</max_step_size>
+  <world name="rf_comms_custom2">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
     </physics>
     <plugin
@@ -63,6 +63,7 @@
       name="ignition::gazebo::systems::RFComms_custom">
       <file_config>
         <comms_analysis>/home/haruki/Desktop/ugv_comms_in_gazebo/comms_analysis/</comms_analysis>
+        <!-- <comms_analysis>./comms_analysis/</comms_analysis> -->
       </file_config>
       <range_config>
         <max_range>500.0</max_range>
@@ -77,6 +78,7 @@
         <thermal_noise_density>-174</thermal_noise_density>
         <modulation>QPSK</modulation>
         <antenna_gains_dir_path>/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains/</antenna_gains_dir_path> 
+        <!-- <antenna_gains_dir_path>./antenna_gains/</antenna_gains_dir_path> -->
       </radio_config>
     </plugin>
 
@@ -128,7 +130,7 @@
             <match field="data">56</match>
         </input>
         <output type="ignition.msgs.Twist" topic="/multicopter_0/gazebo/command/twist">
-            linear: {x: 1.0 y: 0.0 z: 0.0}, angular: {z: 0.0}
+            linear: {x: 2.0 y: 0.0 z: 0.0}, angular: {z: 0.0}
         </output>
     </plugin>
 

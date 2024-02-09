@@ -379,7 +379,7 @@ double RFComms_custom::Implementation::PoseToGain(
   auto eDirection = direction;
   eDirection.Y(0.0);
 
-  igndbg << eDirection << std::endl;
+  // igndbg << eDirection << std::endl;
 
   double theta = round((this->RadianToDegree(acos(eDirection.Normalized().Dot(ignition::math::Vector3d::UnitX))))*10.)/10.;
   if (eDirection.Z() < 0.0)
@@ -397,7 +397,7 @@ double RFComms_custom::Implementation::PoseToGain(
   auto hDirection = direction;
   hDirection.Z(0.0);
 
-  igndbg << hDirection << std::endl;
+  // igndbg << hDirection << std::endl;
 
   double varphi = round(this->RadianToDegree(acos(hDirection.Normalized().Dot(ignition::math::Vector3d::UnitX)))*10.)/10.;
   if (hDirection.Y() < 0.0)
@@ -414,8 +414,8 @@ double RFComms_custom::Implementation::PoseToGain(
 
   if (itEPlane == std::end(this->radioConfig.ePlane) || itHPlane == std::end(this->radioConfig.hPlane)) 
   {
-    igndbg << "[" << _initialPointState.name << "]" << std::endl;
-    igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
+    // igndbg << "[" << _initialPointState.name << "]" << std::endl;
+    // igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
     return -std::numeric_limits<double>::infinity();
   }
 
@@ -426,8 +426,8 @@ double RFComms_custom::Implementation::PoseToGain(
   // （アンテナ利得最大 - H-Planeの減衰）+（アンテナ利得最大 - E-Planeの減衰）- アンテナ利得最大 = アンテナ利得最大 - H-Planeの減衰 - E-Planeの減衰
   // 参考文献あり
 
-  igndbg << "[" << _initialPointState.name << "]" << std::endl;
-  igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
+  // igndbg << "[" << _initialPointState.name << "]" << std::endl;
+  // igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
   // igndbg << "AntennaGain(E-Plane): " << this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1] << std::endl;
   // igndbg << "AntennaGain(H-Plane): " << this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1] << std::endl;
   // igndbg << "AntennaGain3d: " << antennaGain << std::endl;
@@ -700,11 +700,11 @@ std::tuple<bool, double, double, double, double> RFComms_custom::Implementation:
 double RFComms_custom::Implementation::AttemptMeasure(
   RadioState &_txState, RadioState &_rxState)
 {
-  igndbg << "_txState Pos: " <<  _txState.pose.Pos() << std::endl;
-  igndbg << "_rxState Pos: " <<  _rxState.pose.Pos() << std::endl;
+  // igndbg << "_txState Pos: " <<  _txState.pose.Pos() << std::endl;
+  // igndbg << "_rxState Pos: " <<  _rxState.pose.Pos() << std::endl;
   
-  igndbg << "_txState Rot: " <<  _txState.pose.Rot() << std::endl;
-  igndbg << "_rxState Rot: " <<  _rxState.pose.Rot() << std::endl;
+  // igndbg << "_txState Rot: " <<  _txState.pose.Rot() << std::endl;
+  // igndbg << "_rxState Rot: " <<  _rxState.pose.Rot() << std::endl;
   
   const double txAntennaGain = this->PoseToGain(_txState, _rxState);
   
@@ -723,7 +723,7 @@ double RFComms_custom::Implementation::AttemptMeasure(
   }
 
   const double rxAnntennaGain = this->PoseToGain(_rxState, _txState);
-  igndbg << "rxAntennaGain: " << rxAnntennaGain << std::endl;
+  // igndbg << "rxAntennaGain: " << rxAnntennaGain << std::endl;
   return rxPower + rxAnntennaGain;
 }
 
@@ -899,14 +899,6 @@ void RFComms_custom::Step(
         std::chrono::duration<double>(_info.simTime).count();
       this->dataPtr->radioStates[address].name = content.modelName;
       this->dataPtr->radioStates[address].antennaRot = kPose.Rot();
-      // if (this->dataPtr->radioStates[address].name == "multicopter_0")
-      // {
-      //   this->dataPtr->radioStates[address].antennaRot = kPose.Rot() * this->dataPtr->radioConfig.rxAntennaRot;
-      // }
-      // else 
-      // {
-      //   this->dataPtr->radioStates[address].antennaRot = kPose.Rot() * this->dataPtr->radioConfig.txAntennaRot;
-      // }
     }
   }
 
