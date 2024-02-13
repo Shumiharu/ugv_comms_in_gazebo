@@ -367,19 +367,26 @@ double RFComms_custom::Implementation::DbmToPow(double _dBm) const
 }
 
 
-/////////////////////////////////////////////
+///////////////////////////////////////////// 
 double RFComms_custom::Implementation::PoseToGain(
   const RadioState &_initialPointState,
   const RadioState &_terminalPointState) const
 {
+  // (送信側/受信側)から見た(受信側/送信側)のベクトル(_terminalPointState.pose.Pos() - _initialPointState.pose.Pos())を \
+  (送信側/受信側)アンテナの回転だけ逆回転させる(_initialPointState.antennaRot.RotateVectorReverse)ことで \
+  実質的に(送信側/受信側)アンテナから見た(受信側/送信側)のベクトルを算出する
+
+  // 例えば、送信側が(x y z)(r p y)=(0 0 0)(0 0 0)でアンテナ角が(r p y)=(0 0 1/4*pi) \
+  受信側が(x y z)(r p y)=(3 3 0)(0 0 0)でアンテナ角が(r p y)=(0 0 -3/4*pi)の場合 \
+  得られるベクトル direction は送信側/受信側でいずれも(x y z)=(3√2 0 0)となる
+
   auto direction = _initialPointState.antennaRot.RotateVectorReverse(_terminalPointState.pose.Pos() - _initialPointState.pose.Pos());
   
-  igndbg << "direction: " << direction << " [" << _initialPointState.name << "]" << std::endl;
+  // igndbg << "direction: " << direction << " [" << _initialPointState.name << "]" << std::endl;
 
+  // E面における(放射角/到来角）、thetaを空間ベクトルの内積の公式より算出する
   auto eDirection = direction;
   eDirection.Y(0.0);
-
-  // igndbg << eDirection << std::endl;
 
   double theta = round((this->RadianToDegree(acos(eDirection.Normalized().Dot(ignition::math::Vector3d::UnitX))))*10.)/10.;
   if (eDirection.Z() < 0.0)
@@ -387,6 +394,7 @@ double RFComms_custom::Implementation::PoseToGain(
     theta = -theta;
   }
 
+  // 算出したthetaをE面のアンテナパターンにあてはめる
   auto itEPlane = std::find_if(
     std::begin(this->radioConfig.ePlane), std::end(this->radioConfig.ePlane),
     [&](const auto& row) {
@@ -394,10 +402,9 @@ double RFComms_custom::Implementation::PoseToGain(
     }
   );
 
+  // H面における(放射角/到来角）、varphiを空間ベクトルの内積の公式より算出する
   auto hDirection = direction;
   hDirection.Z(0.0);
-
-  // igndbg << hDirection << std::endl;
 
   double varphi = round(this->RadianToDegree(acos(hDirection.Normalized().Dot(ignition::math::Vector3d::UnitX)))*10.)/10.;
   if (hDirection.Y() < 0.0)
@@ -405,6 +412,7 @@ double RFComms_custom::Implementation::PoseToGain(
     varphi = -varphi;
   }
 
+  // 算出したvarphiをH面のアンテナパターンにあてはめる
   auto itHPlane = std::find_if(
     std::begin(this->radioConfig.hPlane), std::end(this->radioConfig.hPlane),
     [&](const auto& row) {
@@ -412,22 +420,23 @@ double RFComms_custom::Implementation::PoseToGain(
     }
   );
 
+  // igndbg << "[" << _initialPointState.name << "]" << std::endl;
+  // igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
+
+  // いずれかでもあてはまらなかった場合、アンテナ利得は-infになる
   if (itEPlane == std::end(this->radioConfig.ePlane) || itHPlane == std::end(this->radioConfig.hPlane)) 
   {
-    // igndbg << "[" << _initialPointState.name << "]" << std::endl;
-    // igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
+
     return -std::numeric_limits<double>::infinity();
   }
 
+  // アンテナ素子の指向性利得　= アンテナ素子の最大指向性利得(dBi) - E面のアンテナ素子の放射パターンによる減衰(dB)  - H面のアンテナ素子の放射パターンによる減衰(dB)で算出する \
+  プログラム上はアンテナ素子の最大指向性利得(dBi) - E面のアンテナ素子の放射パターンによる減衰(dB) + アンテナ素子の最大指向性利得(dBi) - H面のアンテナ素子の放射パターンによる減衰(dB) - アンテナ素子の最大指向性利得(dBi)
+  
   const double antennaGain = this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1]
                              + this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1]
                              - this->radioConfig.maxAntennaGain;
-  
-  // （アンテナ利得最大 - H-Planeの減衰）+（アンテナ利得最大 - E-Planeの減衰）- アンテナ利得最大 = アンテナ利得最大 - H-Planeの減衰 - E-Planeの減衰
-  // 参考文献あり
 
-  // igndbg << "[" << _initialPointState.name << "]" << std::endl;
-  // igndbg << "theta: " << theta << " varphi: " << varphi << std::endl;
   // igndbg << "AntennaGain(E-Plane): " << this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1] << std::endl;
   // igndbg << "AntennaGain(H-Plane): " << this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1] << std::endl;
   // igndbg << "AntennaGain3d: " << antennaGain << std::endl;
