@@ -11,13 +11,23 @@ Ignition Gazebo: Fortress
 
 ## Usage 
 ```
-python ./launch.py # UGV
-python3 ./launch2.py # multicopter
+python3 ./launch.py <launch_config>
 ```
-launch.py及びlaunch2.pyは以下を同時に処理します。各処理の詳細については後述します。
+launch_configは./launch_configにあるyamlファイルを参照します。
+yamlの構成は以下の通りです。
+```
+src: ./srcにあるシステムプラグインのディレクトリ名を入力する。通常はrf_comms_custom
+plugin: システムプラグインの名前を入力する。通常はRFComms_custom
+world: シミュレーション実行ファイル（.sdf）の名前を入力する。
+debug_level: Gazeboのメッセージの出力レベルを入力。おおよそ0か5で良い。
+tx: ./modelsにある送信側モデル名を入力する。（単数形）ground_station_antennaなど
+rx: ./modelsにある受信側モデル名を入力する。（単数形）
+
+```
+また、launch.pyは以下を同時に処理します（実行したコマンドがターミナルに出力されます。したがってエラーが発生した場合はまずコマンドが正しく入力されているか確認してください）。各処理の詳細については後述します。
 1. ./src/comms/publisher.cc のビルド
 2. ./src/rf_comms_custom/rf_comms_custom.cc のビルド & ビルドされた実行ファイル libRFComms_custom.so を該当ディレクトリにコピー
-3. ./modelsにある地上局とモビリティのモデルをXML macro（xacro）からunified robot description format（urdf）に変換
+3. ./modelsにある地上局(Tx)とモビリティ(Rx)のモデルをXML macro（xacro）からunified robot description format（urdf）に変換
 4. Gazebo GUIの起動
 5. Gazebo GUIに3.のモデルを生成
 6. publish（送信）の開始
@@ -38,7 +48,7 @@ cd build
 cmake ..
 make
 ```
-なお、launch.py/launch2.pyではbuild出力ディレクトリ（./src/comms/build）は作成されている前提で実行している点に注意してください。
+なお、launch.pyではbuild出力ディレクトリ（./src/comms/build）は作成されている前提で実行している点に注意してください。
 オリジナルはgz-sim/examples/standalone/commsにあります。
 
 ## 2. ./src/rf_comms_custom/rf_comms_custom.cc のビルド & ビルドされた実行ファイル libRFComms_custom.so を該当ディレクトリにコピー
@@ -51,7 +61,7 @@ cmake ..
 make
 sudo cp ./libRFComms_custom.so /usr/lib/x86_64-linux-gnu/ign-gazebo-6/plugins/.
 ```
-なお、launch.py/launch2.pyではbuild出力ディレクトリ（./src/rf_comms_custom/build）は作成されている前提で実行している点に注意してください。
+なお、launch.pyではbuild出力ディレクトリ（./src/rf_comms_custom/build）は作成されている前提で実行している点に注意してください。
 また、sudoのため、管理者のパスワードを求められます。
 
 ## 3. ./modelsにある地上局とモビリティのモデルをXML macro（xacro）からunified robot description format（urdf）に変換
@@ -111,20 +121,39 @@ ign service -s ./world/${WORLD_NAME}/create \
                   --reptype ignition.msgs.Boolean \
                   --timeout 5000 \
                   --req 'sdf_filename: "./models/${MODEL_NAME}s/urdf/${MODEL_NAME}_0.urdf", name: "${MODEL_NAME}_0"'
+
+// example
+ign service -s /world/rf_comms_custom2/create \
+                  --reqtype ignition.msgs.EntityFactory  \
+                  --reptype ignition.msgs.Boolean \
+                  --timeout 5000 \
+                  --req 'sdf_filename: "./models/multicopters/urdf/multicopter_0.urdf", name: "multicopter_0"'
+
+ign service -s /world/rf_comms_custom2/create \
+                  --reqtype ignition.msgs.EntityFactory  \
+                  --reptype ignition.msgs.Boolean \
+                  --timeout 5000 \
+                  --req 'sdf_filename: "./models/ground_station_antennas/urdf/ground_station_antenna_0.urdf", name: "ground_station_antenna_0"'
 ```
 参考: https://gazebosim.org/docs/fortress/spawn_urdf
 
 ## 6. publish（送信）の開始
 ```
-./publisher ${GROUND_STATION_ANTENNA_MODEL_NAME} # ex: ./publisher ground_station_antenna_0
+./src/comms/build/publisher ${GROUND_STATION_ANTENNA_MODEL_NAME}
+
+// example 
+./src/comms/build/publisher ground_station_antenna_0
 ```
-## 7. subscribe（受信）の開始
+## 7. subscribe（受信したメッセージの表示）の開始
 ```
-ign topic -e -t ${MOBILITY_MODEL_NAME}/rx # ex: ign topic -e -t multicopter_0/rx
+ign topic -e -t ${MOBILITY_MODEL_NAME}/rx
+
+// example
+ign topic -e -t multicopter_0/rx
 ```
 
 ## 8. launch.pyのプログラムの強制終了（ctrl + c）待機 & 終了後に子プロセスを強制終了
-Pythonのサブプロセスは親プロセス（launch.py/launch2.py）を強制終了させても子プロセス（6.や7.のコマンド）は強制終了せず、PCの処理能力が低下するので注意。
+Pythonのサブプロセスは親プロセス（launch.py）を強制終了させても子プロセス（6.や7.のコマンド）は強制終了せず、PCの処理能力が低下するので注意。
 
 
 
