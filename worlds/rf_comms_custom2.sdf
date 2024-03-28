@@ -63,7 +63,7 @@
       name="ignition::gazebo::systems::RFComms_custom">
       <file_config>
         <comms_analysis>/home/haruki/Desktop/ugv_comms_in_gazebo/comms_analysis/</comms_analysis>
-        <!-- <comms_analysis>./comms_analysis/</comms_analysis> -->
+        <comms_analysis>./comms_analysis/</comms_analysis>
       </file_config>
       <range_config>
         <max_range>500.0</max_range>
@@ -78,7 +78,9 @@
         <thermal_noise_density>-174</thermal_noise_density>
         <modulation>QPSK</modulation>
         <antenna_gains_dir_path>/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains/</antenna_gains_dir_path> 
-        <!-- <antenna_gains_dir_path>./antenna_gains/</antenna_gains_dir_path> -->
+        <antenna_gains_dir_path>./antenna_gains/</antenna_gains_dir_path>
+        <comms_duration>1.0</comms_duration>
+        <comms_threshold>-65.5</comms_threshold>
       </radio_config>
     </plugin>
 
@@ -130,7 +132,7 @@
             <match field="data">56</match>
         </input>
         <output type="ignition.msgs.Twist" topic="/multicopter_0/gazebo/command/twist">
-            linear: {x: 2.0 y: 0.0 z: 0.0}, angular: {z: 0.0}
+            linear: {x: 2.0 y: 0.0 z: 0.2}, angular: {z: 0.0}
         </output>
     </plugin>
 
@@ -141,7 +143,7 @@
             <match field="data">50</match>
         </input>
         <output type="ignition.msgs.Twist" topic="/multicopter_0/gazebo/command/twist">
-            linear: {x: -1.0 y: 0.0 z: 0.0}, angular: {z: 0.0}
+            linear: {x: -1.0 y: 0.0 z: 0.1}, angular: {z: 0.0}
         </output>
     </plugin>
 

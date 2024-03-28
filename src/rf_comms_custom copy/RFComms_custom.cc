@@ -113,6 +113,9 @@ struct RangeConfiguration
 /// Static parameters such as channel capacity and transmit power.
 struct RadioConfiguration
 {
+  /// \brief Speed of Light (in GHz).
+  double speedOfLight = 3.0 * pow(10.0, 8.0);
+
   /// \brief Center Frequency (in GHz).
   double centerFrequency = 60.0;
   
@@ -141,11 +144,9 @@ struct RadioConfiguration
 
   ignition::math::Quaterniond rxAntennaRot = ignition::math::Quaterniond(M_PI/2, 0., M_PI/4);
 
-  double commsDuration = 1000;
-
-  double commsThreshold = -65.5;
-
   double maxAntennaGain;
+
+  std::vector<std::string> srcNodes;
 
   /// Output stream operator.
   /// \param _oss Stream.
@@ -176,9 +177,6 @@ struct RadioState
   /// \brief Pose of the radio.
   ignition::math::Pose3<double> pose;
 
-  /// \brief Pose of the radio.
-  ignition::math::Vector3d antennaPos;
-
   /// \brief Angle of the radio.
   ignition::math::Quaterniond antennaRot;
 
@@ -193,18 +191,6 @@ struct RadioState
 
   /// \brief Accumulation of bytes received in an epoch.
   uint64_t bytesReceivedThisEpoch = 0;
-
-  /// \brief Received Signal Strngth Indicator.
-  std::unordered_map<std::string, double> rssi;
-  
-  /// \brief Signal-to-Interference-plus-Noise Ratio.
-  double sinr;
-
-  /// \brief Name of the model communicating.
-  std::string srcNode = "";
-
-  /// \brief Name of the model communicating.
-  double timeout = 0;
 
   /// \brief Name of the model associated with the radio.
   std::string name;
@@ -243,10 +229,13 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
   /// \param[in] _numBytes Size of the packet.
   /// \return std::tuple<bool, double> reporting if the packet should be
   /// delivered and the received signal strength (in dBm).
+  public: std::tuple<bool, double, double, double, double> AttemptSend(RadioState &_txState,
+                                               RadioState &_rxState,
+                                               const uint64_t &_numBytes);
 
-  public: double RssiToSinr(std::string address, RadioState _rxState);
+  public: double RxPowerToSINR(int i, std::vector<double> _eachRSSI);
   
-  public: double MeasureRssi(RadioState &_txState,
+  public: double AttemptMeasure(RadioState &_txState,
                                 RadioState &_rxState);
 
   public: std::tuple<bool, double> SINRToBER(std::vector<double> &_SINR, const uint64_t &_numBytes);
@@ -255,8 +244,7 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
   public: std::vector<std::vector<double>> FileToArray(std::string _filePath) const;
 
   private: double PoseToGain(const RadioState &_initialPointState,
-                             const RadioState &_terminalPointState,
-                             const ignition::math::Quaterniond &_currentAntennaRot) const;
+                             const RadioState &_terminalPointState) const;
 
   /// \brief Convert degree to radian.
   public: double DegreeToRadian(double _degree) const;
@@ -378,19 +366,17 @@ double RFComms_custom::Implementation::DbmToPow(double _dBm) const
 ///////////////////////////////////////////// 
 double RFComms_custom::Implementation::PoseToGain(
   const RadioState &_initialPointState,
-  const RadioState &_terminalPointState,
-  const ignition::math::Quaterniond &_currentAntennaRot) const
+  const RadioState &_terminalPointState) const
 {
-
   // (送信側/受信側)から見た(受信側/送信側)のベクトル(_terminalPointState.pose.Pos() - _initialPointState.pose.Pos())を \
-  (送信側/受信側)アンテナの回転だけ逆回転させる(_currentAntennaRot.RotateVectorReverse)ことで \
+  (送信側/受信側)アンテナの回転だけ逆回転させる(_initialPointState.antennaRot.RotateVectorReverse)ことで \
   実質的に(送信側/受信側)アンテナから見た(受信側/送信側)のベクトルを算出する
 
   // 例えば、送信側が(x y z)(r p y)=(0 0 0)(0 0 0)でアンテナ角が(r p y)=(0 0 1/4*pi) \
   受信側が(x y z)(r p y)=(3 3 0)(0 0 0)でアンテナ角が(r p y)=(0 0 -3/4*pi)の場合 \
   得られるベクトル direction は送信側/受信側でいずれも(x y z)=(3√2 0 0)となる
 
-  auto direction = _currentAntennaRot.RotateVectorReverse(_terminalPointState.pose.Pos() - _initialPointState.pose.Pos());
+  auto direction = _initialPointState.antennaRot.RotateVectorReverse(_terminalPointState.pose.Pos() - _initialPointState.pose.Pos());
   
   // igndbg << "direction: " << direction << " [" << _initialPointState.name << "]" << std::endl;
 
@@ -528,13 +514,12 @@ RFPower RFComms_custom::Implementation::FreeSpaceReceivedPower(
   const double &_txPower, const RadioState &_txState,
   const RadioState &_rxState) const
 {
-  const double speedOfLight = 3.0 * pow(10.0, 8.0);
   const double kRange = _txState.pose.Pos().Distance(_rxState.pose.Pos());
 
   if (this->rangeConfig.maxRange > 0.0 && kRange > this->rangeConfig.maxRange) // 通信可能範囲外の場合
     return {-std::numeric_limits<double>::infinity(), 0.0};
 
-  const double kPL = 20. * log10(4. * M_PI * kRange * this->radioConfig.centerFrequency/speedOfLight);
+  const double kPL = 20. * log10(4. * M_PI * kRange * this->radioConfig.centerFrequency/this->radioConfig.speedOfLight);
 
   return {_txPower - kPL, pow(this->rangeConfig.sigma, 2.)};
 }
@@ -555,14 +540,128 @@ RFPower RFComms_custom::Implementation::LogNormalReceivedPower(
   return {_txPower - kPL, pow(this->rangeConfig.sigma, 2.)};
 }
 
-double RFComms_custom::Implementation::MeasureRssi(
+/////////////////////////////////////////////
+std::tuple<bool, double, double, double, double> RFComms_custom::Implementation::AttemptSend(
+  RadioState &_txState, RadioState &_rxState, const uint64_t &_numBytes)
+{
+  double now = _txState.timeStamp;
+
+  // Maintain running window of bytes sent over the last epoch, e.g., 1s.
+  while (!_txState.bytesSent.empty() &&
+         _txState.bytesSent.front().first <= now - this->epochDuration)
+  {
+    _txState.bytesSentThisEpoch -= _txState.bytesSent.front().second;
+    _txState.bytesSent.pop_front();
+  }
+
+  // igndbg << "Bytes sent: " <<  _txState.bytesSentThisEpoch << " + "
+  //        << _numBytes << " = "
+  //        << _txState.bytesSentThisEpoch + _numBytes << std::endl;
+
+  // Compute prospective accumulated bits along with time window
+  // (including this packet).
+  double bitsSent = (_txState.bytesSentThisEpoch + _numBytes) * 8;
+
+  // Check current epoch bitrate vs capacity and fail to send accordingly
+  if (bitsSent > this->radioConfig.capacity * this->epochDuration)
+  {
+    ignwarn << "Bitrate limited: [" << _txState.name << "] " << bitsSent
+            << " bits sent (limit: "
+            << this->radioConfig.capacity * this->epochDuration << ")"
+            << std::endl;
+    return std::make_tuple(false, -std::numeric_limits<double>::max(), 1.0, 1.0, std::numeric_limits<double>::lowest());
+  }
+
+  // Record these bytes.
+  _txState.bytesSent.push_back(std::make_pair(now, _numBytes));
+  _txState.bytesSentThisEpoch += _numBytes;
+
+  // Get each antenna gain based on the angle of radiation/arrival.
+  const double txAntennaGain = this->PoseToGain(_txState, _rxState);
+  const double rxAnntennaGain = this->PoseToGain(_rxState, _txState);
+
+  // Get the received power based on TX power and position of each node.
+  // auto rxPowerDist =
+  //   this->FreeSpaceReceivedPower(this->radioConfig.txPower, _txState, _rxState);
+
+  auto rxPowerDist =
+    this->LogNormalReceivedPower(this->radioConfig.txPower + txAntennaGain + rxAnntennaGain, _txState, _rxState);
+
+  double rxPower = rxPowerDist.mean;
+  if (rxPowerDist.variance > 0.0)
+  {
+    std::normal_distribution<> d{rxPowerDist.mean, sqrt(rxPowerDist.variance)};
+    rxPower = d(this->rndEngine);
+  }
+
+  // Based on rx_power, noise value, and modulation, compute the bit
+  // error rate (BER).
+  double ber = this->QPSKPowerToBER(
+    this->DbmToPow(rxPower), this->DbmToPow(this->radioConfig.thermalNoiseDensity));
+
+  // double ber = this->PowerToBER(
+  //   this->DbmToPow(rxPower), this->DbmToPow(this->radioConfig.thermalNoiseDensity), this->radioConfig.modulation);
+
+  double packetDropProb = 1.0 - exp(_numBytes * log(1 - ber));
+
+  igndbg << "TX power (dBm): " << this->radioConfig.txPower << "\n" <<
+            "RX power (dBm): " << rxPower << "\n" <<
+            "BER: " << ber << "\n" <<
+            "# Bytes: " << _numBytes << "\n" <<
+            "PER: " << packetDropProb << std::endl;
+
+  double randDraw = ignition::math::Rand::DblUniform(); // 一様分布
+  bool packetReceived = randDraw > packetDropProb;
+
+  if (!packetReceived)
+    return std::make_tuple(false, -std::numeric_limits<double>::max(), ber, packetDropProb, 0.0);
+
+  // Maintain running window of bytes received over the last epoch, e.g., 1s.
+  while (!_rxState.bytesReceived.empty() &&
+         _rxState.bytesReceived.front().first <= now - this->epochDuration)
+  {
+    _rxState.bytesReceivedThisEpoch -= _rxState.bytesReceived.front().second;
+    _rxState.bytesReceived.pop_front();
+  }
+
+  // igndbg << "bytes received: " << _rxState.bytesReceivedThisEpoch
+  //        << " + " << _numBytes
+  //       << " = " << _rxState.bytesReceivedThisEpoch + _numBytes << std::endl;
+
+  // Compute prospective accumulated bits along with time window
+  // (including this packet).
+  double bitsReceived = (_rxState.bytesReceivedThisEpoch + _numBytes) * 8;
+
+  // Check current epoch bitrate vs capacity and fail to send accordingly.
+  if (bitsReceived > this->radioConfig.capacity * this->epochDuration)
+  {
+    ignwarn << "Bitrate limited: [" << _rxState.name << "] " <<  bitsReceived
+            << " bits received (limit: "
+            << this->radioConfig.capacity * this->epochDuration << ")"
+            << std::endl;
+    return std::make_tuple(false, -std::numeric_limits<double>::max(), ber, packetDropProb, 0.0);
+  }
+
+  double throughput = this->PowerToThroughput(rxPower); // NICTのデータより算出
+
+  // Record these bytes.
+
+  _rxState.bytesReceived.push_back(std::make_pair(now, _numBytes));
+  _rxState.bytesReceivedThisEpoch += _numBytes;
+
+  return std::make_tuple(true, rxPower, ber, packetDropProb, throughput);
+}
+
+double RFComms_custom::Implementation::AttemptMeasure(
   RadioState &_txState, RadioState &_rxState)
 {
-  ignition::math::Quaterniond txCurrentAntennaRot = _txState.antennaRot*this->radioConfig.txAntennaRot;
-
-  ignition::math::Quaterniond rxCurrentAntennaRot = _rxState.antennaRot*this->radioConfig.rxAntennaRot;
+  // igndbg << "_txState Pos: " <<  _txState.pose.Pos() << std::endl;
+  // igndbg << "_rxState Pos: " <<  _rxState.pose.Pos() << std::endl;
   
-  const double txAntennaGain = this->PoseToGain(_txState, _rxState, txCurrentAntennaRot);
+  // igndbg << "_txState Rot: " <<  _txState.pose.Rot() << std::endl;
+  // igndbg << "_rxState Rot: " <<  _rxState.pose.Rot() << std::endl;
+  
+  const double txAntennaGain = this->PoseToGain(_txState, _rxState);
   // const double txAntennaGain = 0;
   
   auto rxPowerDist =
@@ -576,10 +675,9 @@ double RFComms_custom::Implementation::MeasureRssi(
     rxPower = d(this->rndEngine);
   }
 
-  const double rxAnntennaGain = this->PoseToGain(_rxState, _txState, rxCurrentAntennaRot);
+  const double rxAnntennaGain = this->PoseToGain(_rxState, _txState);
   // const double rxAnntennaGain = 0;
   // igndbg << "rxAntennaGain: " << rxAnntennaGain << std::endl;
-
   return rxPower + rxAnntennaGain;
 }
 
@@ -589,32 +687,26 @@ std::tuple<bool, double> RFComms_custom::Implementation::SINRToBER(
   return std::make_tuple(true, 0.1);
 }
 
-double RFComms_custom::Implementation::RssiToSinr(
-  std::string _address, RadioState _rxState)
+double RFComms_custom::Implementation::RxPowerToSINR(
+  int i, std::vector<double> _eachRSSI)
 {
-  double rssi;
-  double interferencePower = 0.;
-  for (const auto& pair : _rxState.rssi)
-  {
-
-    double pow = this->DbmToPow(pair.second);
-    if (_address == pair.first)
-    {
-      rssi = pow;
-    }
-    else
-    {
-      interferencePower += pow;
-    }
-  }
-
   double noiseFloor= this->DbmToPow(this->radioConfig.thermalNoiseDensity)*this->radioConfig.capacity;
 
-  igndbg << _address << "'s rssi[mW]: " << rssi << std::endl;
-  igndbg << "interference_power[mW]: " << interferencePower << std::endl;
-  igndbg << "noiseFloor[mW]: " << noiseFloor << std::endl;
+  double interferencePower = 0.0;
+  for (auto &_otherRSSI : _eachRSSI)
+  {
+    if (_eachRSSI[i] != _otherRSSI)
+      interferencePower += this->DbmToPow(_otherRSSI);
+  }
 
-  return 10*log10(rssi/(interferencePower + noiseFloor));
+  // igndbg << "interference_power[mW]: " << interferencePower << std::endl;
+  // igndbg << "noiseFloor[mW]: " << noiseFloor << std::endl;
+
+  double SINR = 10*log10(this->DbmToPow(_eachRSSI[i])/(noiseFloor + interferencePower));
+
+  // igndbg << "SINR[dB]: " << SINR << std::endl;
+
+  return SINR;
 }
 
 //////////////////////////////////////////////////
@@ -636,6 +728,7 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
     this->dataPtr->fileConfig.commsAnalysisDirPath = 
       elem->Get<std::string>("comms_analysis", this->dataPtr->fileConfig.commsAnalysisDirPath).first;
   }
+  
   
   if (_sdf->HasElement("range_config"))
   {
@@ -680,14 +773,6 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
       elem->Get<std::string>("antenna_gains_dir_path",
         this->dataPtr->radioConfig.antennaGainsDirPath).first;
     
-    this->dataPtr->radioConfig.commsDuration = 
-      elem->Get<double>("comms_duration",
-        this->dataPtr->radioConfig.commsDuration).first;
-
-    this->dataPtr->radioConfig.commsThreshold =
-      elem->Get<double>("comms_threshold",
-          this->dataPtr->radioConfig.commsThreshold).first;
-    
     this->dataPtr->radioConfig.ePlane = 
       this->dataPtr->FileToArray(this->dataPtr->radioConfig.antennaGainsDirPath + "e_plane.csv");
     double maxGainEPlane = -std::numeric_limits<double>::infinity();
@@ -703,17 +788,23 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
     {
       maxGainHPlane = std::max(maxGainHPlane, row[1]);
     }
-
-    // 最大のアンテナ利得は各面の最大利得を足して2で割ったものとする
+  
     this->dataPtr->radioConfig.maxAntennaGain = (maxGainHPlane + maxGainEPlane)/2.; // 各面の最大値の平均 
 
-    
+    // this->dataPtr->radioConfig.txAntennaRot =
+    //   elem->Get<ignition::math::Quaterniond>("tx_antenna_rot",
+    //     this->dataPtr->radioConfig.txAntennaRot).first;
+
+    // this->dataPtr->radioConfig.rxAntennaRot =
+    //   elem->Get<ignition::math::Quaterniond>("rx_antenna_rot",
+    //     this->dataPtr->radioConfig.rxAntennaRot).first;
+        
   }
 
   // Generate  files
   std::string commsAnalysisFilePath = this->dataPtr->fileConfig.commsAnalysisDirPath + this->dataPtr->fileConfig.currentDateTime() + ".csv";
   this->dataPtr->writing_file.open(commsAnalysisFilePath, std::ios::out);
-  this->dataPtr->writing_file << "Time[s],X[m],Y[m],Z[m],From,RSSI[dBm],SINR[dB],Throughput[Gbps]" << std::endl;
+  this->dataPtr->writing_file << "X[m],Y[m],Z[m],From,RSSI[dBm],SINR[dB],Throughput[Gbps]" << std::endl;
 
   igndbg << "File configuration:" << std::endl
          << this->dataPtr->fileConfig << std::endl;
@@ -723,7 +814,10 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
 
   igndbg << "Radio configuration:" << std::endl
          << this->dataPtr->radioConfig << std::endl;
+
 }
+
+auto a = 0;
 
 //////////////////////////////////////////////////
 void RFComms_custom::Step(
@@ -732,6 +826,7 @@ void RFComms_custom::Step(
       comms::Registry &_newRegistry,
       EntityComponentManager &_ecm)
 {
+  a += 1;
   // Update ratio states.
   for (auto & [address, content] : _currentRegistry)
   {
@@ -755,19 +850,20 @@ void RFComms_custom::Step(
       // Update radio state.
       const auto kPose = gazebo::worldPose(content.entity, _ecm);
       this->dataPtr->radioStates[address].pose = kPose;
-      this->dataPtr->radioStates[address].antennaPos = kPose.Pos();
-      this->dataPtr->radioStates[address].antennaRot = kPose.Rot();
       this->dataPtr->radioStates[address].timeStamp =
         std::chrono::duration<double>(_info.simTime).count();
       this->dataPtr->radioStates[address].name = content.modelName;
+      this->dataPtr->radioStates[address].antennaRot = kPose.Rot();
     }
   }
 
+  std::vector<double> eachRSSI;
   for (auto & [address, content] : _currentRegistry)
   {
+    // std::cout << a << std::endl;
     // Reference to the outbound queue for this address.
     auto &outbound = content.outboundMsgs;
-    
+    // std::cout << outbound.size() << std::endl;
     // The source address needs to be attached to a robot.
     auto itSrc = this->dataPtr->radioStates.find(address);   
     if (itSrc != this->dataPtr->radioStates.end())
@@ -777,60 +873,68 @@ void RFComms_custom::Step(
       {
         // The destination address needs to be attached to a robot.
         auto itDst = this->dataPtr->radioStates.find(msg->dst_address());
-        if (itDst == this->dataPtr->radioStates.end())
-          continue;
 
-        // Measure RSSI
-        double rssi = this->dataPtr->MeasureRssi(itSrc->second, itDst->second);
-        igndbg << "RSSI[" << itSrc->first << "][dBm]: " << rssi << std::endl;
-
-        itDst->second.rssi.insert_or_assign(itSrc->first, rssi);
-
-        // RSSIが測定範囲外の場合は以降の処理を行わない
-        if (!std::isfinite(rssi))
-          continue;
+        // adjust default antenna rotation
+        this->dataPtr->radioStates[itSrc->first].antennaRot *= this->dataPtr->radioConfig.txAntennaRot;
+        this->dataPtr->radioStates[itDst->first].antennaRot *= this->dataPtr->radioConfig.rxAntennaRot;
         
-        // RSSIが閾値以上かつタイムアウトしている（他の地上局と通信していない）場合
-        if (rssi > this->dataPtr->radioConfig.commsThreshold && itDst->second.timeStamp > itDst->second.timeout)
+        // measure RSSI
+        double RSSI = this->dataPtr->AttemptMeasure(itSrc->second, itDst->second);
+        igndbg << "RSSI: " << RSSI << std::endl;
+        eachRSSI.push_back(RSSI);
+
+        bool isConnecting = std::find(this->dataPtr->radioConfig.srcNodes.begin(), this->dataPtr->radioConfig.srcNodes.end(), address) != this->dataPtr->radioConfig.srcNodes.end();
+        if (!isConnecting)
         {
-          itDst->second.srcNode = itSrc->first;
-          itDst->second.timeout = itDst->second.timeStamp + this->dataPtr->radioConfig.commsDuration;
-          igndbg << "Communication launched with " << itDst->second.srcNode << std::endl;
-        } else if (itDst->second.timeStamp > itDst->second.timeout)
-        {
-          itDst->second.srcNode = "";
+          this->dataPtr->radioConfig.srcNodes.push_back(address);
         }
+      }
+    }
+  }
 
-        igndbg << "threshold[dBm]: " << this->dataPtr->radioConfig.commsThreshold << std::endl;
-        igndbg << "timeStamp/timeout: " << itDst->second.timeStamp << "/" << itDst->second.timeout << std::endl;
+  if (eachRSSI.size() == this->dataPtr->radioConfig.srcNodes.size())
+  {
+    int i = 0;
+    for (auto & [address, content] : _currentRegistry)
+    {
+      auto &outbound = content.outboundMsgs;
+      auto itSrc = this->dataPtr->radioStates.find(address);   
+      if (itSrc != this->dataPtr->radioStates.end())
+      {
+        for (const auto &msg : outbound)
+        {
+          auto itDst = this->dataPtr->radioStates.find(msg->dst_address());
+          
+          if (itDst == this->dataPtr->radioStates.end())
+            continue;
 
-        // 通信中の地上局以外は以降の処理を行わない
-        if (itDst->second.srcNode != itSrc->first)
-          continue;
-        
-        // Calculate SINR
-        double sinr = this->dataPtr->RssiToSinr(itSrc->first, itDst->second);
-        igndbg << "SINR[" << itSrc->first << "][dB]: " << sinr << std::endl;
+          double SINR = this->dataPtr->RxPowerToSINR(i ,eachRSSI);
+          
+          // auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
 
-        auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
-        auto *commsAnalysisPtr = inboundMsg->mutable_header()->add_data();
-        commsAnalysisPtr->set_key("RSSI/SINR: " + address);
-        commsAnalysisPtr->add_value(std::to_string(rssi) + "/" + std::to_string(sinr));
-        
-        _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
+          // Add RSSI and SINR.
+          // auto *commsAnalysisPtr = inboundMsg->mutable_header()->add_data();
+          // commsAnalysisPtr->set_key("RSSI/SINR: " + address);
+          // commsAnalysisPtr->add_value(std::to_string(eachRSSI[i]) + "/" + std::to_string(SINR));
+          
+          // _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
 
-        ignition::math::Pose3 mobilityPose = this->dataPtr->radioStates[msg->dst_address()].pose;
-            this->dataPtr->writing_file << itDst->second.timeStamp << ","
-                                        << mobilityPose.Pos().X() << ","
+          if (eachRSSI[i] != -std::numeric_limits<double>::infinity())
+          {
+            ignition::math::Pose3 mobilityPose = this->dataPtr->radioStates[msg->dst_address()].pose;
+            this->dataPtr->writing_file << mobilityPose.Pos().X() << ","
                                         << mobilityPose.Pos().Y() << ","
                                         << mobilityPose.Pos().Z() << ","
                                         << address << ","
-                                        << rssi << ","
-                                        << sinr << std::endl;
+                                        << eachRSSI[i] << ","
+                                        << SINR << std::endl;
+          }
+          ++i;
+        }
       }
+      // Clear the outbound queue.
+      // _newRegistry[address].outboundMsgs.clear();
     }
-    // Clear the outbound queue.
-    _newRegistry[address].outboundMsgs.clear();
   }
 }
 

@@ -1,6 +1,7 @@
 src: rf_comms_custom
 plugin: RFComms_custom
 world: rf_comms_custom
-debug_level: 0
+debug_level: 5
 tx: ground_station
 rx: ugv
+is_spawned: false
