@@ -141,11 +141,17 @@ struct RadioConfiguration
 
   ignition::math::Quaterniond rxAntennaRot = ignition::math::Quaterniond(M_PI/2, 0., M_PI/4);
 
+  /// \brief Communication duration from launching association.
   double commsDuration = 1000;
 
+  /// \brief Threshold of rx power to launching setup.
   double commsThreshold = -65.5;
-
+  
+  /// \brief Max antenna gain calculated by 3D antenna patterns.
   double maxAntennaGain;
+
+  /// \brief Delay from expired comms to launching new setup.
+  double switchingDelay;
 
   /// Output stream operator.
   /// \param _oss Stream.
@@ -799,6 +805,7 @@ void RFComms_custom::Step(
         } else if (itDst->second.timeStamp > itDst->second.timeout)
         {
           itDst->second.srcNode = "";
+          double a = itDst->second.timeStamp + this->dataPtr->radioConfig.switchingDelay;
         }
 
         igndbg << "threshold[dBm]: " << this->dataPtr->radioConfig.commsThreshold << std::endl;
