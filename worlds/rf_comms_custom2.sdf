@@ -2,7 +2,7 @@
 <sdf version="1.6">
   <world name="rf_comms_custom2">
     <physics name="1ms" type="ignored">
-      <max_step_size>0.001</max_step_size>
+      <max_step_size>0.01</max_step_size>
       <real_time_factor>1.0</real_time_factor>
     </physics>
     <plugin
@@ -79,8 +79,11 @@
         <modulation>QPSK</modulation>
         <antenna_gains_dir_path>/home/haruki/Desktop/ugv_comms_in_gazebo/antenna_gains/</antenna_gains_dir_path> 
         <antenna_gains_dir_path>./antenna_gains/</antenna_gains_dir_path>
-        <comms_duration>1.0</comms_duration>
-        <comms_threshold>-65.5</comms_threshold>
+        <associate_duration>1.0</associate_duration>
+        <threshold_power>-65.5</threshold_power>
+        <switching_delay>0.2</switching_delay>
+        <beacon_interval>1</beacon_interval>
+        <is_sequential>false</is_sequential>
       </radio_config>
     </plugin>
 
