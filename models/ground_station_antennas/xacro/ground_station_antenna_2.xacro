@@ -3,7 +3,7 @@
   <xacro:arg name="current_dirpath" default=""/>
   <xacro:property name="entity_name" value="ground_station_antenna_2"/>
   
-  <xacro:property name="pos_2d" value="12 3"/>
+  <xacro:property name="pos_2d" value="9 3"/>
   <xacro:property name="antenna_height" value="1.8"/>
 
   <xacro:include filename="$(arg current_dirpath)/models/xacro_base/ground_station_antenna.xacro" /> 

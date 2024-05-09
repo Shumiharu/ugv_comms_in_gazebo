@@ -3,7 +3,7 @@
   <world name="rf_comms_custom2">
     <physics name="10us" type="ignored">
       <max_step_size>0.00001</max_step_size>
-      <max_step_size>0.01</max_step_size>
+      <!-- <max_step_size>0.01</max_step_size> -->
       <real_time_factor>1.0</real_time_factor>
     </physics>
     <plugin
@@ -85,7 +85,7 @@
         <switching_delay>0.127</switching_delay>
         <beacon_interval>0.100</beacon_interval>
         <plot_interval>0.01</plot_interval>
-        <is_sequential>false</is_sequential>
+        <is_scheduled>false</is_scheduled>
       </radio_config>
     </plugin>
 
