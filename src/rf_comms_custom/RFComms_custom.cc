@@ -134,11 +134,17 @@ struct RadioConfiguration
   /// \brief Max antenna gain calculated by 3D antenna patterns.
   double maxAntennaGain;
 
+  /// \brief Max antenna attenuation.
+  double maxAntennaAttenuation = 30.;
+
   /// \brief Delay from expired comms to launching new setup.
   double switchingDelay;
 
-  /// \brief Interval of broadcasting beacons
+  /// \brief Interval of broadcasting beacons (s)
   double beaconInterval;
+
+  /// \brief Interval of plotting (s)
+  double plotInterval = 0.001;
 
   /// \brief Whether communication with AP (like ground station) is sequential. 
   bool isSequential = false;
@@ -190,8 +196,17 @@ struct RadioState
   /// \brief Accumulation of bytes received in an epoch.
   uint64_t bytesReceivedThisEpoch = 0;
 
+  /// \brief 
+  double scheduledPlotTime = 0.;
+
   /// \brief Received Signal Strngth Indicator.
   std::unordered_map<std::string, double> timeReceivedBeacon;
+
+  double scheduledBeaconTransmittionTime = 0.;
+  
+  std::string scheduledAssociateWith = "";
+
+  int scheduledAssociationIndex = 0;
 
   /// \brief Received Signal Strngth Indicator.
   std::unordered_map<std::string, double> rssi;
@@ -203,10 +218,12 @@ struct RadioState
   std::string srcNode = "";
 
   /// \brief Time expired association.
-  double timeout = 0;
+  double timeout = 0.;
 
   /// \brief Whether communication is being setup.
   bool isBeingSetup = false;
+
+  std::string currentSetupWith = "";
 
   /// \brief Time setup phase completed.
   double timeSetupCompleted = 0;
@@ -214,8 +231,21 @@ struct RadioState
   /// \brief Whether communication was launched.
   bool isAssociated = false;
 
+  std::string currentAssociateWith = "";
+
   /// \brief Whether communication was launched.
   double totalDataTransferred = 0.;
+
+  /// \brief .
+  std::vector<std::pair<double, double>> totalTimeItsLevel = {{-39., 0.},
+                                               {-45., 0.},
+                                               {-49., 0.},
+                                               {-51., 0.},
+                                               {-55., 0.},
+                                               {-58., 0.},
+                                               {-61., 0.}};
+
+  double previousTimeStamp = 0.;
 
   /// \brief Name of the model associated with the radio.
   std::string name;
@@ -260,8 +290,6 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
   public: double MeasureRssi(RadioState &_txState,
                                 RadioState &_rxState);
 
-  public: std::tuple<bool, double> SinrToBer(std::vector<double> &_SINR, const uint64_t &_numBytes);
-
   /// \brief Convert from e_plane.csv and h_plane.csv to two dimensional array.
   public: std::vector<std::vector<double>> FileToArray(std::string _filePath) const;
 
@@ -288,8 +316,7 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
   private: double QPSKPowerToBER(double _power,
                                  double _noise) const;
 
-  private: double PowerToBER(double _power,
-                             double _noise,
+  private: double SinrToBer(double _sinr,
                              std::string _modulation) const;
   
   
@@ -310,6 +337,8 @@ class ignition::gazebo::systems::RFComms_custom::Implementation
   /// \brief Convert RSSI to throuput based on examination NICT operated.
   /// \param[in] _rssi received signal strength indicator（RSSI）.
   public: double RssiToThrouputInGbps(double _rssi) const;
+
+  public: std::pair<int, double> RssiToTotalTimeItsLevel(double _rssi, double _timestepInSeconds, std::vector<std::pair<double, double>> &_totalTimeItsLevel) const;
 
   /// \brief Range configuration.
   public: RangeConfiguration rangeConfig;
@@ -448,68 +477,41 @@ double RFComms_custom::Implementation::PoseToGain(
 
   // いずれかでもあてはまらなかった場合、アンテナ利得は-infになる
   if (itEPlane == std::end(this->radioConfig.ePlane) || itHPlane == std::end(this->radioConfig.hPlane)) 
-  {
-
     return -std::numeric_limits<double>::infinity();
-  }
 
   // アンテナ素子の指向性利得　= アンテナ素子の最大指向性利得(dBi) - E面のアンテナ素子の放射パターンによる減衰(dB)  - H面のアンテナ素子の放射パターンによる減衰(dB)で算出する \
   プログラム上はアンテナ素子の最大指向性利得(dBi) - E面のアンテナ素子の放射パターンによる減衰(dB) + アンテナ素子の最大指向性利得(dBi) - H面のアンテナ素子の放射パターンによる減衰(dB) - アンテナ素子の最大指向性利得(dBi)
+  double antennaGainEPlane = this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1];
+  double antennaAttenuationEPlane = this->radioConfig.maxAntennaGain - antennaGainEPlane;
+  if (antennaAttenuationEPlane > this->radioConfig.maxAntennaAttenuation)
+  {
+    antennaAttenuationEPlane = this->radioConfig.maxAntennaAttenuation;
+    // ignwarn << "E面で下限値を超えました" << std::endl;
+  }
   
-  const double antennaGain = this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1]
-                             + this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1]
-                             - this->radioConfig.maxAntennaGain;
+  double antennaGainHPlane = this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1];
+  double antennaAttenuationHPlane = this->radioConfig.maxAntennaGain - antennaGainEPlane;
+  if (antennaAttenuationHPlane > this->radioConfig.maxAntennaAttenuation)
+  {
+    antennaAttenuationHPlane = this->radioConfig.maxAntennaAttenuation;
+    // ignwarn << "H面で下限値を超えました" << std::endl;
+  }
 
-  // igndbg << "AntennaGain(E-Plane): " << this->radioConfig.ePlane[std::distance(std::begin(this->radioConfig.ePlane), itEPlane)][1] << std::endl;
-  // igndbg << "AntennaGain(H-Plane): " << this->radioConfig.hPlane[std::distance(std::begin(this->radioConfig.hPlane), itHPlane)][1] << std::endl;
+  double antennaGain = this->radioConfig.maxAntennaGain - antennaAttenuationEPlane -antennaAttenuationHPlane;
+
+  double minAntennaGain = this->radioConfig.maxAntennaGain - this->radioConfig.maxAntennaAttenuation;
+
+  if (antennaGain < minAntennaGain)
+  {
+    antennaGain = minAntennaGain;
+    // ignwarn << "3Dで下限値を超えました" << std::endl;
+  }
+
+  // igndbg << "AntennaGain(E-Plane): " << antennaGainEPlane << std::endl;
+  // igndbg << "AntennaGain(H-Plane): " << antennaGainHPlane << std::endl;
   // igndbg << "AntennaGain3d: " << antennaGain << std::endl;
-                            
+                      
   return antennaGain;
-}
-
-////////////////////////////////////////////
-double RFComms_custom::Implementation::QPSKPowerToBER(
-  double _power, 
-  double _noise) const
-{
-  return erfc(sqrt(_power / _noise)); // これあってる？？
-}
-
-double RFComms_custom::Implementation::PowerToBER(
-  double _power, 
-  double _noise, 
-  std::string _modulation) const
-{ 
-  double SNR = 10.0 * log10(_power/_noise);
-  if (_modulation.compare("QPSK") == 0)
-    return 0.5 * erfc(sqrt(SNR/2.0));
-  if (_modulation.compare("16QAM"))
-    return 0.375 * erfc(sqrt(SNR/10.0)); 
-  if (_modulation.compare("64QAM"))
-    return (sqrt(64.0) - 1.0)/(log2(64.0) * pow(2.0, log2(64.0)/2.0 - 1.0)) * erfc(sqrt(SNR * (3.0/(2.0 * (64.0 - 1.0)))));
-  if (_modulation.compare("256QAM"))
-    return (sqrt(256.0) - 1.0)/(log2(256.0) * pow(2.0, log2(256.0)/2.0 - 1.0)) * erfc(sqrt(SNR * (3.0/(2.0 * (256.0 - 1.0)))));
-  return std::numeric_limits<double>::lowest();
-}
-
-// NICTから提供いただいたテーブルを元に作成
-double RFComms_custom::Implementation::RssiToThrouputInGbps(
-  double _rssi) const
-{ 
-  if (_rssi > -51.0)
-    return 6.0;
-  else if (_rssi > -55.0)
-    return 4.7;
-  else if (_rssi > -58.5)
-    return 2.7;
-  else if (_rssi > -61.5)
-    return 2.15;
-  else if (_rssi > -63.5)
-    return 1.1;
-  else if (_rssi > -65.5)
-    return 0.5;
-  else 
-    return 0.0;
 }
 
 /////////////////////////////////////////////
@@ -572,12 +574,6 @@ double RFComms_custom::Implementation::MeasureRssi(
   return rxPower + rxAnntennaGain;
 }
 
-std::tuple<bool, double> RFComms_custom::Implementation::SinrToBer(
-  std::vector<double> &_SINR, const uint64_t &_numBytes)
-{
-  return std::make_tuple(true, 0.1);
-}
-
 double RFComms_custom::Implementation::RssiToSinr(
   std::string _address, RadioState _rxState)
 {
@@ -600,6 +596,70 @@ double RFComms_custom::Implementation::RssiToSinr(
 
   return 10*log10(rssi/(interferencePower + noiseFloor));
 }
+
+////////////////////////////////////////////
+double RFComms_custom::Implementation::QPSKPowerToBER(
+  double _power, 
+  double _noise) const
+{
+  return erfc(sqrt(_power / _noise)); // これあってる？？
+}
+
+double RFComms_custom::Implementation::SinrToBer(
+  double _sinr,
+  std::string _modulation) const
+{ 
+  if (_modulation.compare("QPSK") == 0)
+    return 0.5 * erfc(sqrt(_sinr/2.0));
+  if (_modulation.compare("16QAM"))
+    return 0.375 * erfc(sqrt(_sinr/10.0)); 
+  if (_modulation.compare("64QAM"))
+    return (sqrt(64.0) - 1.0)/(log2(64.0) * pow(2.0, log2(64.0)/2.0 - 1.0)) * erfc(sqrt(_sinr * (3.0/(2.0 * (64.0 - 1.0)))));
+  if (_modulation.compare("256QAM"))
+    return (sqrt(256.0) - 1.0)/(log2(256.0) * pow(2.0, log2(256.0)/2.0 - 1.0)) * erfc(sqrt(_sinr * (3.0/(2.0 * (256.0 - 1.0)))));
+  return std::numeric_limits<double>::lowest();
+}
+
+// NICTから提供いただいたテーブルを元に作成
+double RFComms_custom::Implementation::RssiToThrouputInGbps(
+  double _rssi) const
+{ 
+  if (_rssi > -51.0)
+    return 6.0;
+  else if (_rssi > -55.0)
+    return 4.7;
+  else if (_rssi > -58.5)
+    return 2.7;
+  else if (_rssi > -61.5)
+    return 2.15;
+  else if (_rssi > -63.5)
+    return 1.1;
+  else if (_rssi > -65.5)
+    return 0.5;
+  else 
+    return 0.0;
+}
+
+std::pair<int, double> RFComms_custom::Implementation::RssiToTotalTimeItsLevel(
+  double _rssi,
+  double _timestepInSeconds,
+  std::vector<std::pair<double, double>> &_totalTimeItsLevel) const
+{
+  int index = _totalTimeItsLevel.size();
+  for (auto &pair: _totalTimeItsLevel)
+  {
+    index += -1;
+    ignwarn << pair.first << std::endl;
+    if (_rssi > pair.first)
+    {
+      pair.second += _timestepInSeconds;
+      ignwarn << index << ": " << pair.second << " s" << std::endl;
+      return std::make_pair(index, pair.second);
+    }
+  }
+  return std::make_pair(-1, 0.);
+}
+
 
 //////////////////////////////////////////////////
 RFComms_custom::RFComms_custom()
@@ -675,6 +735,10 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
     this->dataPtr->radioConfig.beaconInterval =
       elem->Get<double>("beacon_interval",
           this->dataPtr->radioConfig.beaconInterval).first;
+
+    this->dataPtr->radioConfig.plotInterval =
+      elem->Get<double>("plot_interval",
+          this->dataPtr->radioConfig.plotInterval).first;
       
     this->dataPtr->radioConfig.switchingDelay =
       elem->Get<double>("switching_delay",
@@ -703,7 +767,10 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
     }
 
     // 最大のアンテナ利得は各面の最大利得を足して2で割ったものとする
-    this->dataPtr->radioConfig.maxAntennaGain = (maxGainHPlane + maxGainEPlane)/2.; // 各面の最大値の平均 
+    this->dataPtr->radioConfig.maxAntennaGain = (maxGainHPlane + maxGainEPlane)/2.; // 各面の最大値の平均
+
+    // 減衰の下限値
+    // this->dataPtr->radioConfig.maxAntennaAttenuation = 30.
 
   }
 
@@ -711,7 +778,8 @@ void RFComms_custom::Load(const Entity &/*_entity*/,
   // Generate  files
   std::string commsAnalysisFilePath = this->dataPtr->fileConfig.commsAnalysisDirPath + this->dataPtr->fileConfig.currentDateTime() + ".csv";
   this->dataPtr->writing_file.open(commsAnalysisFilePath, std::ios::out);
-  this->dataPtr->writing_file << "Time[s],X[m],Y[m],Z[m],From,RSSI[dBm],SINR[dB],Throughput[Gbps],TotalDataTransferred[GB]" << std::endl;
+  // this->dataPtr->writing_file << "Time[s],X[m],Y[m],Z[m],From,RSSI[dBm],SINR[dB],Throughput[Gbps],TotalDataTransferred[GB]";
+  this->dataPtr->writing_file << "Time[s],SrcName,SrcX[m],SrcY[m],SrcZ[m],DstName,DstX[m],DstY[m],DstZ[m],RSSI[dBm],SINR[dB],-39dBm,-45dBm,-49dBm,-51dBm,-55dBm,-58dBm,-61dBm";
 
   igndbg << "File configuration:" << std::endl
          << this->dataPtr->fileConfig << std::endl;
@@ -773,123 +841,257 @@ void RFComms_custom::Step(
     
     // The source address needs to be attached to a robot.
     auto itSrc = this->dataPtr->radioStates.find(address);   
+
     if (itSrc != this->dataPtr->radioStates.end())
     {
-      std::string srcBaseName = itSrc->first.substr(0, itSrc->first.length()-1);
       // All these messages need to be processed.
       for (const auto &msg : outbound)
       {
+        std::string srcAddress = itSrc->first;
+        std::string srcAddressBase = srcAddress.substr(0, srcAddress.length()-1);
+        
         // The destination address needs to be attached to a robot.
         auto itDst = this->dataPtr->radioStates.find(msg->dst_address());
         if (itDst == this->dataPtr->radioStates.end())
           continue;
         
+        std::string dstAddress = itDst->first;
+        std::string dstAddressBase = dstAddress.substr(0, dstAddress.length()-1);
+
+        itSrc->second.scheduledAssociateWith = dstAddressBase + std::to_string(itDst->second.scheduledAssociationIndex);
+        itDst->second.scheduledAssociateWith = srcAddressBase + std::to_string(itSrc->second.scheduledAssociationIndex);
         // 
-        auto itReceivedBeacon = itDst->second.timeReceivedBeacon.find(itSrc->first);
-        if (itReceivedBeacon == itDst->second.timeReceivedBeacon.end())
+        // auto itReceivedBeacon = itDst->second.timeReceivedBeacon.find(srcAddress);
+        // if (itReceivedBeacon == itDst->second.timeReceivedBeacon.end())
+        // {
+        //   itDst->second.timeReceivedBeacon.insert_or_assign(srcAddress, 0.);
+        //   itDst->second.sequentialSrcNode = srcAddressBase + std::to_string(0);
+        // } 
+        // else 
+        // {
+        //   // setup及びassociatedフェーズではない場合
+        //   if (itDst->second.srcNode == "")
+        //   {
+        //     igndbg << "timeStamp/timeBeaconReceived[" << srcAddress << "]: " << itDst->second.timeStamp << "/" << itReceivedBeacon->second << std::endl;
+        //     // タイムスタンプがビーコン受信時間以上の場合
+        //     if (itDst->second.timeStamp >= itReceivedBeacon->second)
+        //       // 次のビーコン受信時間を設定して以降の処理を継続する
+        //       itReceivedBeacon->second = itDst->second.timeStamp + this->dataPtr->radioConfig.beaconInterval;
+        //     else
+        //       // 以降の処理をスキップする
+        //       continue;
+        //   }
+        // }
+
+        bool isSrcBusy = itSrc->second.currentSetupWith != "" && itSrc->second.currentSetupWith != dstAddress ||
+                         itSrc->second.currentAssociateWith != "" && itSrc->second.currentAssociateWith != dstAddress;
+        
+        bool isDstBusy = itDst->second.currentSetupWith != "" && itDst->second.currentSetupWith != srcAddress ||
+                         itDst->second.currentAssociateWith != "" && itDst->second.currentAssociateWith != srcAddress;
+        
+        if (isSrcBusy || isDstBusy)
+          continue;
+      
+        // 
+        bool isAssociated = itSrc->second.currentAssociateWith == dstAddress && itDst->second.currentAssociateWith == srcAddress;
+        if (isAssociated)
+          igndbg << "Associated time: " << srcAddress << " <=== " << itSrc->second.timeStamp << "/" << itSrc->second.timeout << " ===> " << dstAddress << std::endl;
+
+        // 
+        bool isSetup = itSrc->second.currentSetupWith == dstAddress && itDst->second.currentSetupWith == srcAddress;
+        if (isSetup)
+          igndbg << "Setup time: " << srcAddress << " <=== " << itSrc->second.timeStamp << "/" << itSrc->second.timeSetupCompleted << " ===> " << dstAddress << std::endl;
+        
+        // 
+        if (!isSetup && !isAssociated)
         {
-          itDst->second.timeReceivedBeacon.insert_or_assign(itSrc->first, 0.);
-          if (this->dataPtr->radioConfig.isSequential == false && itDst->second.sequentialSrcNode == "")
-            itDst->second.sequentialSrcNode = itSrc->first;
+          igndbg << "Beacon transmmit time: " << srcAddress << " <=== " << itSrc->second.timeStamp << "/" << itSrc->second.scheduledBeaconTransmittionTime << " ===> " << dstAddress << std::endl;
+          if (itSrc->second.timeStamp >= itSrc->second.scheduledBeaconTransmittionTime)
+            itSrc->second.scheduledBeaconTransmittionTime = itSrc->second.timeStamp + this->dataPtr->radioConfig.beaconInterval;
           else
-            // 0番目に固定する
-            {
-            itDst->second.sequentialSrcNode = srcBaseName + std::to_string(0);
-            ignerr << itDst->second.sequentialSrcNode << std::endl;
-            }
-        } 
-        else 
-        {
-          // setup及びassociatedフェーズではない場合
-          if (itDst->second.srcNode == "")
-          {
-            igndbg << "timeStamp/timeBeaconReceived[" << itSrc->first << "]: " << itDst->second.timeStamp << "/" << itReceivedBeacon->second << std::endl;
-            // タイムスタンプがビーコン受信時間以上の場合
-            if (itDst->second.timeStamp >= itReceivedBeacon->second)
-              // 次のビーコン受信時間を設定して以降の処理を継続する
-              itReceivedBeacon->second = itDst->second.timeStamp + this->dataPtr->radioConfig.beaconInterval;
-            else
-              // 以降の処理をスキップする
-              continue;
-          }
+            continue;
         }
 
-        // 指定先のファイルにモビリティの座標を描画する（ビーコン送信時はビーコンの送信間隔、その他はシミュレーションのステップ間隔）
-        bool isPlottable = itDst->second.srcNode == "" && itDst->second.sequentialSrcNode == itSrc->first || itDst->second.srcNode != "" && itDst->second.srcNode == itSrc->first;
-        if (isPlottable)
-        {
-          ignition::math::Pose3 mobilityPose = itDst->second.pose;
-          this->dataPtr->writing_file << itDst->second.timeStamp << ","
-                                      << mobilityPose.Pos().X() << ","
-                                      << mobilityPose.Pos().Y() << ","
-                                      << mobilityPose.Pos().Z();
-        }
-        
         // RSSIの測定
         double rssi = this->dataPtr->MeasureRssi(itSrc->second, itDst->second);
-        if (itDst->second.srcNode == itSrc->first || itDst->second.isBeingSetup == false)
-          igndbg << "RSSI[" << itSrc->first << "][dBm]: " << rssi << std::endl;
+        // bool isCommsAnalysisPlottableInRssi = std::isfinite(rssi);
+        // if (itDst->second.srcNode == srcAddress || itDst->second.isBeingSetup == false
+        igndbg << "RSSI: " << srcAddress << " <=== " << rssi << " dBm ===> " << dstAddress << std::endl;
 
-        itDst->second.rssi.insert_or_assign(itSrc->first, rssi);
+        itDst->second.rssi.insert_or_assign(srcAddress, rssi);
+
+        // 指定先のファイルにモビリティの座標を描画する
+        // bool isCommsAnalysisPlottableInSrcNode = itDst->second.srcNode == "" && itDst->second.sequentialSrcNode == srcAddress ||
+        //                    itDst->second.srcNode != "" && itDst->second.srcNode == srcAddress;
           
-        // associatedフェーズで、タイムアウトしている場合、通信を終了する
-        if (itDst->second.isAssociated && itDst->second.srcNode == itSrc->first && itDst->second.timeStamp > itDst->second.timeout)
+        bool isCommsAnalysisPlottable = !isSrcBusy &&
+                                        !isDstBusy &&
+                                        itSrc->second.scheduledAssociateWith == dstAddress &&
+                                        itDst->second.scheduledAssociateWith == srcAddress &&
+                                        itSrc->second.timeStamp > itSrc->second.scheduledPlotTime &&
+                                        itDst->second.timeStamp > itDst->second.scheduledPlotTime;
+        if (isCommsAnalysisPlottable)
         {
-          itDst->second.srcNode = ""; // リンク先の設定を解除する
-          itDst->second.isAssociated = false; // 通信を終了する
-          ignwarn << itSrc->first << " <===> " << itDst->first << " was expired." << std::endl;
-
-          // 0, 1, 2,...と接続先を順番に切り替える場合、次の接続先を指定する
-          if (this->dataPtr->radioConfig.isSequential)
-          {
-            itDst->second.sequentialSrcNode = srcBaseName + std::to_string(std::atoi(&itDst->second.sequentialSrcNode.back()) + 1);
-            igndbg << "Next connection is " << itDst->second.sequentialSrcNode << std::endl;
-          }
+          itSrc->second.scheduledPlotTime += this->dataPtr->radioConfig.plotInterval; 
+          itDst->second.scheduledPlotTime += this->dataPtr->radioConfig.plotInterval; 
+          ignition::math::Pose3 srcPose = itSrc->second.pose;          
+          ignition::math::Pose3 dstPose = itDst->second.pose;
+          this->dataPtr->writing_file << std::endl 
+                                      << itSrc->second.timeStamp << ","
+                                      << srcAddress << ","
+                                      << srcPose.Pos().X() << ","
+                                      << srcPose.Pos().Y() << ","
+                                      << srcPose.Pos().Z() << ","
+                                      << dstAddress << ","
+                                      << dstPose.Pos().X() << ","
+                                      << dstPose.Pos().Y() << ","
+                                      << dstPose.Pos().Z();
         }
 
-        // RSSIが閾値以上かつ他の地上局とリンクしていない場合、setupフェーズに移行する
-        if (itDst->second.isBeingSetup == false && itDst->second.srcNode == "" && rssi > this->dataPtr->radioConfig.thresholdPower)
+        // Disassociationを行う
+        bool isDisassociation = isAssociated && (rssi < this->dataPtr->radioConfig.thresholdPower || itSrc->second.timeStamp > itSrc->second.timeout);
+        if (isDisassociation)
         {
-          // 0, 1, 2,...と接続先を順番に切り替える場合、次に接続するAPではない限り、以降の処理を行わない
-          if (this->dataPtr->radioConfig.isSequential && itSrc->first != itDst->second.sequentialSrcNode)
-            continue;
+          ignwarn << srcAddress << " was disassociated with " << dstAddress << std::endl;
+          
+          itSrc->second.currentAssociateWith = "";
+          // itSrc->second.scheduledAssociationIndex += 1;
+          ignwarn << srcAddress << " will associate with " << dstAddressBase << itSrc->second.scheduledAssociationIndex << std::endl;
+          
+          itDst->second.currentAssociateWith = "";
+          itDst->second.scheduledAssociationIndex += 1;
+          ignwarn << dstAddress << " will associate with " << srcAddressBase << itDst->second.scheduledAssociationIndex << std::endl;
+        }
 
-          itDst->second.srcNode = itSrc->first; // リンク先を設定する
-          itDst->second.timeSetupCompleted = itDst->second.timeStamp + this->dataPtr->radioConfig.switchingDelay; // setupが完了するまでの時間を設定する
-          itDst->second.isBeingSetup = true; // setupフェーズのフラグを立てる
-          ignwarn << itSrc->first << " <===> " << itDst->first << " is being setup." << std::endl;
-        } 
+        // associatedフェーズで、タイムアウトしている場合、通信を終了する
+        // if (itDst->second.isAssociated && itDst->second.srcNode == srcAddress && itDst->second.timeStamp > itDst->second.timeout)
+        // {
+        //   itDst->second.srcNode = ""; // リンク先の設定を解除する
+        //   itDst->second.isAssociated = false; // 通信を終了する
+        //   ignwarn << srcAddress << " <===> " << dstAddress << " was expired." << std::endl;
 
-        // setupフェーズの進捗を表示
-        if (itDst->second.isBeingSetup)
-          igndbg << "timeStamp/timeSetupCompleted[" << itDst->second.srcNode << "]: " << itDst->second.timeStamp << "/" << itDst->second.timeSetupCompleted << std::endl;
+        //   // 0, 1, 2,...と接続先を順番に切り替える場合、次の接続先を指定する
+        //   if (this->dataPtr->radioConfig.isSequential)
+        //     itDst->second.sequentialSrcNode = srcAddressBase + std::to_string(std::atoi(&itDst->second.sequentialSrcNode.back()) + 1);
+        // }
+
+        // RSSIが閾値以上かつ他の地上局とリンクしていない場合、setupフェーズに移行する
+        // if (itDst->second.isBeingSetup == false && itDst->second.srcNode == "" && rssi > this->dataPtr->radioConfig.thresholdPower)
+        // {
+        //   // 0, 1, 2,...と接続先を順番に切り替える場合、次に接続するAPではない限り、以降の処理を行わない
+        //   if (this->dataPtr->radioConfig.isSequential && srcAddress != itDst->second.sequentialSrcNode)
+        //     continue;
+
+        //   itDst->second.srcNode = srcAddress; // リンク先を設定する
+        //   itDst->second.timeSetupCompleted = itDst->second.timeStamp + this->dataPtr->radioConfig.switchingDelay; // setupが完了するまでの時間を設定する
+        //   itDst->second.isBeingSetup = true; // setupフェーズのフラグを立てる
+        //   ignwarn << srcAddress << " <===> " << dstAddress << " is being setup." << std::endl;
+        // }
+
+       
+        bool isAssociationRequestable = !isSrcBusy &&
+                                        !isDstBusy &&
+                                        !isAssociated && 
+                                        !isSetup &&
+                                        rssi > this->dataPtr->radioConfig.thresholdPower;
+        if (isAssociationRequestable)
+        {
+          itSrc->second.currentSetupWith = dstAddress;
+          itDst->second.currentSetupWith = srcAddress;
+          itSrc->second.timeSetupCompleted = itSrc->second.timeStamp + this->dataPtr->radioConfig.switchingDelay;
+          ignwarn << srcAddress << " is setup with " << dstAddress << " until " << itSrc->second.timeSetupCompleted << std::endl;
+        }
         
         // 設定したリンク先と一致し、setupフェーズが終了した場合、associatedフェーズに移行する
-        if (itDst->second.isBeingSetup && itDst->second.srcNode == itSrc->first && itDst->second.timeStamp > itDst->second.timeSetupCompleted)
+        // if (itDst->second.isBeingSetup && itDst->second.srcNode == srcAddress && itDst->second.timeStamp > itDst->second.timeSetupCompleted)
+        // {
+        //   itDst->second.timeout = itDst->second.timeStamp + this->dataPtr->radioConfig.associateDuration; // タイムアウトを設定
+        //   itDst->second.isAssociated = true;
+        //   itDst->second.isBeingSetup = false;
+        //   ignwarn << srcAddress << " <===> " << dstAddress << " was setup." << std::endl;
+        // }
+
+        bool isAssociationRespondable = isSetup && itSrc->second.timeStamp > itSrc->second.timeSetupCompleted;
+        if (isAssociationRespondable)
         {
-          itDst->second.timeout = itDst->second.timeStamp + this->dataPtr->radioConfig.associateDuration; // タイムアウトを設定
-          itDst->second.isAssociated = true;
-          itDst->second.isBeingSetup = false;
-          ignwarn << itSrc->first << " <===> " << itDst->first << " was setup." << std::endl;
+          itSrc->second.currentSetupWith = "";
+          itDst->second.currentSetupWith = "";
+
+          itSrc->second.currentAssociateWith = dstAddress;
+          itDst->second.currentAssociateWith = srcAddress;
+
+          itSrc->second.timeout = itSrc->second.timeStamp + this->dataPtr->radioConfig.associateDuration;
+          ignwarn << srcAddress << " is associated with " << dstAddress << " until " << itSrc->second.timeout << std::endl;
         }
 
         // 設定したリンク先と一致し、associatedフェーズの場合、SINRを算出して結果を出力する
-        if (itDst->second.isAssociated && itDst->second.srcNode == itSrc->first)
+        // if (itDst->second.isAssociated && itDst->second.srcNode == srcAddress)
+        // {
+        //   igndbg << "timeStamp/timeout[" << itDst->second.srcNode << "]: " << itDst->second.timeStamp << "/" << itDst->second.timeout << std::endl;
+
+        //   // SINRの算出
+        //   double sinr = this->dataPtr->RssiToSinr(srcAddress, itDst->second);
+        //   igndbg << "SINR[" << srcAddress << "][dB]: " << sinr << std::endl;
+
+        //   // Throughputの算出
+        //   // double throughputInGbps = this->dataPtr->RssiToThrouputInGbps(rssi);
+        //   // igndbg << "Throuput[" << srcAddress << "][Gbps]: " << throughputInGbps << std::endl;
+
+        //   // 累積データ転送量の算出
+        //   // double dataTransferredInTimestep = throughputInGbps*timestepInSeconds;
+        //   // itDst->second.totalDataTransferred += dataTransferredInTimestep;
+        //   // igndbg << "Total data transferred: " << itDst->second.totalDataTransferred << std::endl;
+
+        //   double timeStampDuration = itDst->second.timeStamp - itDst->second.previousTimeStamp; // publishの間隔が短くなるほど小さくなる
+        //   for (auto &pair: itDst->second.totalTimeItsLevel)
+        //   {
+        //     if (rssi > pair.first)
+        //     {
+        //       pair.second += timeStampDuration;
+        //       break;
+        //     }
+        //   }
+
+
+        //   for (auto &pair: itDst->second.totalTimeItsLevel)
+        //   {
+        //     ignwarn << rssi << "dBm -> " << pair.first << " dBm(level) -> " << pair.second << " s" <<std::endl; 
+        //   }
+
+        //   auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
+        //   auto *commsAnalysisPtr = inboundMsg->mutable_header()->add_data();
+        //   commsAnalysisPtr->set_key("RSSI/SINR: " + address);
+        //   commsAnalysisPtr->add_value(std::to_string(rssi) + "/" + std::to_string(sinr));
+        //   _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
+
+        //   if (isCommsAnalysisPlottable)
+        //   {
+        //     this->dataPtr->writing_file << "," 
+        //                                 << srcAddress << ","
+        //                                 << rssi << ","
+        //                                 << sinr << ",";
+        //     for (auto &pair: itDst->second.totalTimeItsLevel)
+        //     {
+        //       this->dataPtr->writing_file << pair.second << ",";
+        //     }
+        //   }
+        // }
+
+        if (isAssociated && std::isfinite(rssi))
         {
-          igndbg << "timeStamp/timeout[" << itDst->second.srcNode << "]: " << itDst->second.timeStamp << "/" << itDst->second.timeout << std::endl;
+          double sinr = this->dataPtr->RssiToSinr(srcAddress, itDst->second);
+          igndbg << "SINR: " << srcAddress << " <=== " << sinr << " dB ===> " << dstAddress << std::endl;
 
-          // SINRの算出
-          double sinr = this->dataPtr->RssiToSinr(itSrc->first, itDst->second);
-          igndbg << "SINR[" << itSrc->first << "][dB]: " << sinr << std::endl;
-
-          // Throughputの算出
-          double throughputInGbps = this->dataPtr->RssiToThrouputInGbps(rssi);
-          igndbg << "Throuput[" << itSrc->first << "][Gbps]: " << throughputInGbps << std::endl;
-
-          // 累積データ転送量の算出
-          double dataTransferredInTimestep = throughputInGbps*timestepInSeconds;
-          itDst->second.totalDataTransferred += dataTransferredInTimestep;
-          igndbg << "Total data transferred: " << itDst->second.totalDataTransferred << std::endl;
+          double timeStampDuration = itDst->second.timeStamp - itDst->second.previousTimeStamp; // publishの間隔が短くなるほど小さくなる
+          ignwarn << timeStampDuration << std::endl;
+          for (auto &pair: itDst->second.totalTimeItsLevel)
+          {
+            if (rssi > pair.first)
+            {
+              pair.second += timeStampDuration;
+              break;
+            }
+          }
 
           auto inboundMsg = std::make_shared<ignition::msgs::Dataframe>(*msg);
           auto *commsAnalysisPtr = inboundMsg->mutable_header()->add_data();
@@ -897,19 +1099,22 @@ void RFComms_custom::Step(
           commsAnalysisPtr->add_value(std::to_string(rssi) + "/" + std::to_string(sinr));
           _newRegistry[msg->dst_address()].inboundMsgs.push_back(inboundMsg);
 
-          if (std::isfinite(rssi))
+          if (isCommsAnalysisPlottable)
+          {
             this->dataPtr->writing_file << "," 
-                                        << itSrc->first << ","
                                         << rssi << ","
-                                        << sinr << ","
-                                        << throughputInGbps << ","
-                                        << itDst->second.totalDataTransferred;
+                                        << sinr << ",";
+            for (auto &pair: itDst->second.totalTimeItsLevel)
+            {
+              this->dataPtr->writing_file << pair.second << ",";
+            }
+          }
         }
         
-        // データプロットのための改行
-        if (isPlottable)
-          this->dataPtr->writing_file << std::endl;
-
+        // SetupフェーズまたはAssociatedフェーズのときに累積時間算出のためにpreviousTimeStampを算出する
+        bool isTimeStampRenewable = isSetup || isAssociated;
+        if (isTimeStampRenewable)
+          itDst->second.previousTimeStamp = itDst->second.timeStamp;
       }
     }
     // Clear the outbound queue.

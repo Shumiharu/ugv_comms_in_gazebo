@@ -1,7 +1,7 @@
 src: rf_comms_custom
 plugin: RFComms_custom
 world: rf_comms_custom2
-debug_level: 5
+debug_level: 3
 tx: ground_station_antenna
 rx: multicopter
 is_spawned: true
