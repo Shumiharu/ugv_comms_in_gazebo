@@ -62,6 +62,7 @@ if __name__ == '__main__':
   if is_spawned:
     tx_dir = f'./models/{tx}s/xacro'
     tx_num = sum(os.path.isfile(os.path.join(tx_dir, name)) for name in os.listdir(tx_dir))
+    # tx_num = 2
     for i in range(tx_num):
       _tx = f'{tx}_{i}'
       try:

@@ -82,10 +82,12 @@
         <antenna_gains_dir_path>./antenna_gains/</antenna_gains_dir_path>
         <associate_duration>1.0</associate_duration>
         <threshold_power>-61.0</threshold_power>
-        <switching_delay>0.127</switching_delay>
-        <beacon_interval>0.100</beacon_interval>
+        <!-- <switching_delay>0.127</switching_delay> -->
+        <switching_delay>0.002</switching_delay>
+        <!-- <beacon_interval>0.100</beacon_interval> -->
+        <beacon_interval>0.000025</beacon_interval>
         <plot_interval>0.01</plot_interval>
-        <is_scheduled>false</is_scheduled>
+        <is_scheduled>true</is_scheduled>
       </radio_config>
     </plugin>
 
